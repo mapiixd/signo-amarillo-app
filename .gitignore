@@ -39,3 +39,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+/public/cards
+
+# Prisma
+/prisma/dev.db
+/prisma/dev.db-journal
+*.db
+*.db-journal
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+
+# Logs y archivos de importación
+import-log.txt
+
+# Scripts de setup temporales
+setup.js
