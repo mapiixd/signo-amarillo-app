@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { DeckWithCards } from '@/types'
 import { DeckList } from '@/components/DeckList'
+import Footer from '@/components/Footer'
 
 export default function DecksPage() {
   const [decks, setDecks] = useState<DeckWithCards[]>([])
@@ -57,6 +58,8 @@ export default function DecksPage() {
 
         <DeckList decks={decks} />
       </div>
+
+      <Footer />
     </div>
   )
 }

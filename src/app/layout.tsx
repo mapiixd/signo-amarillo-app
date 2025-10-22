@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Decks Imperio - Creador de Mazos",
-  description: "Crea y gestiona tus mazos de cartas para el juego Imperio",
+  title: "El Signo Amarillo - Constructor de Mazos Imperio",
+  description: "Construye tu imperio, carta por carta. Constructor de mazos para Mitos y Leyendas en formato Imperio.",
+  icons: {
+    icon: '/logo-icon.png',
+    apple: '/logo-icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -27,6 +31,7 @@ export default function RootLayout({
     <html lang="es">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <Navbar />
         {children}

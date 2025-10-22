@@ -1,26 +1,100 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Fondo principal - Negro azulado profundo */
+  --background: #0A0E1A;
+  --background-secondary: #121825;
+  --background-tertiary: #1A2332;
+  
+  /* Textos */
+  --foreground: #E8E8E8;
+  --foreground-secondary: #A0A0A0;
+  --foreground-tertiary: #707070;
+  
+  /* Amarillo del Rey */
+  --yellow-light: #FFFBEB;
+  --yellow: #F4C430;
+  --yellow-dark: #DAA520;
+  --yellow-darker: #B8860B;
+  
+  /* Cyan Místico */
+  --cyan-light: #4ECDC4;
+  --cyan: #2D9B96;
+  --cyan-dark: #1A7F7A;
+  --cyan-darker: #155E5A;
+  
+  /* Oro para acentos */
+  --gold: #FFD700;
+  
+  /* Sombras y efectos */
+  --shadow-yellow: rgba(244, 196, 48, 0.2);
+  --glow-yellow: rgba(244, 196, 48, 0.5);
+  --glow-cyan: rgba(78, 205, 196, 0.3);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  
+  /* Colores personalizados del Signo Amarillo */
+  --color-signo-yellow: var(--yellow);
+  --color-signo-yellow-light: var(--yellow-light);
+  --color-signo-yellow-dark: var(--yellow-dark);
+  
+  --color-signo-cyan: var(--cyan);
+  --color-signo-cyan-light: var(--cyan-light);
+  --color-signo-cyan-dark: var(--cyan-dark);
+  
+  --color-signo-bg: var(--background);
+  --color-signo-bg-secondary: var(--background-secondary);
+  --color-signo-bg-tertiary: var(--background-tertiary);
+  
+  --color-signo-gold: var(--gold);
+  
+  /* Fuentes */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Efectos de glow para el Signo Amarillo */
+.signo-glow {
+  box-shadow: 
+    0 0 10px var(--glow-yellow),
+    0 0 20px var(--shadow-yellow);
+}
+
+.signo-glow-cyan {
+  box-shadow: 
+    0 0 15px var(--glow-cyan),
+    0 0 25px rgba(45, 155, 150, 0.2);
+}
+
+/* Gradiente del Rey de Amarillo */
+.rey-gradient {
+  background: linear-gradient(135deg, var(--yellow) 0%, var(--cyan) 100%);
+}
+
+.rey-gradient-vertical {
+  background: linear-gradient(180deg, var(--yellow) 0%, var(--cyan) 100%);
+}
+
+/* Borde místico */
+.border-mystic {
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 10px var(--glow-cyan);
+}
+
+/* Hover con efecto de glow */
+.hover-glow:hover {
+  box-shadow: 
+    0 0 15px var(--glow-yellow),
+    0 0 30px var(--shadow-yellow);
+  transition: box-shadow 0.3s ease;
 }

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { SupabaseCard, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import Link from 'next/link'
 import Swal from 'sweetalert2'
+import { getCardThumbnailUrl } from '@/lib/cdn'
+import Footer from '@/components/Footer'
 
 interface PaginationInfo {
   page: number
@@ -96,30 +98,30 @@ export default function AdminCardsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando cartas...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F4C430] mx-auto mb-4"></div>
+          <p className="text-[#4ECDC4]">Cargando cartas...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A]">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Administración de Cartas</h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-3xl font-bold text-[#F4C430]">Administración de Cartas</h1>
+              <p className="text-[#4ECDC4] mt-2">
                 Gestiona los datos de todas las cartas del formato Imperio
               </p>
             </div>
             <div className="flex gap-3">
               <Link
                 href="/"
-                className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
+                className="px-6 py-3 bg-[#121825] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#1A2332] transition-colors font-medium flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -128,7 +130,7 @@ export default function AdminCardsPage() {
               </Link>
               <Link
                 href="/admin/cards/new"
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="px-6 py-3 bg-[#F4C430] text-[#0A0E1A] rounded-lg hover:bg-[#FFD700] transition-colors font-medium signo-glow"
               >
                 Nueva Carta
               </Link>
@@ -136,11 +138,11 @@ export default function AdminCardsPage() {
           </div>
 
           {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6">
+          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-md p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Buscador */}
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                   Buscar carta:
                 </label>
                 <input
@@ -148,20 +150,20 @@ export default function AdminCardsPage() {
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   placeholder="Nombre de la carta..."
-                  className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400 shadow-sm transition-all"
+                  className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all"
                 />
               </div>
 
               {/* Filtro por expansión */}
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                   Filtrar por expansión:
                 </label>
                 <select
                   value={selectedExpansion}
                   onChange={(e) => handleExpansionChange(e.target.value)}
                   disabled={expansionsLoading}
-                  className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 disabled:bg-gray-100 disabled:text-gray-500 shadow-sm transition-all cursor-pointer"
+                  className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] disabled:bg-[#121825] disabled:text-[#707070] shadow-sm transition-all cursor-pointer"
                 >
                   <option value="">
                     {expansionsLoading ? 'Cargando...' : 'Todas las expansiones'}
@@ -174,13 +176,13 @@ export default function AdminCardsPage() {
 
               {/* Límite de cartas */}
               <div>
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                   Cartas por página:
                 </label>
                 <select
                   value={limit}
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm transition-all cursor-pointer"
+                  className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
                 >
                   <option value={25}>25</option>
                   <option value={50}>50</option>
@@ -192,81 +194,81 @@ export default function AdminCardsPage() {
 
           {/* Estadísticas */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-2xl font-bold text-blue-600">{pagination?.totalCount || 0}</div>
-              <div className="text-sm text-gray-600">Total de cartas</div>
+            <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow p-4">
+              <div className="text-2xl font-bold text-[#F4C430]">{pagination?.totalCount || 0}</div>
+              <div className="text-sm text-[#4ECDC4]">Total de cartas</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow p-4">
+              <div className="text-2xl font-bold text-green-400">
                 {cards.filter(card => card.is_active).length}
               </div>
-              <div className="text-sm text-gray-600">Completadas (página actual)</div>
+              <div className="text-sm text-[#4ECDC4]">Completadas (página actual)</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-2xl font-bold text-yellow-600">
+            <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow p-4">
+              <div className="text-2xl font-bold text-yellow-400">
                 {cards.filter(card => !card.is_active).length}
               </div>
-              <div className="text-sm text-gray-600">Pendientes (página actual)</div>
+              <div className="text-sm text-[#4ECDC4]">Pendientes (página actual)</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-2xl font-bold text-purple-600">{allExpansions.length}</div>
-              <div className="text-sm text-gray-600">Expansiones</div>
+            <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow p-4">
+              <div className="text-2xl font-bold text-purple-400">{allExpansions.length}</div>
+              <div className="text-sm text-[#4ECDC4]">Expansiones</div>
             </div>
           </div>
         </div>
 
         {/* Tabla de cartas */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-[#2D9B96]">
+              <thead className="bg-[#0A0E1A]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Imagen
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Nombre
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Tipo
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Coste
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Fuerza/Defensa
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Rareza
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Acciones
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-[#121825] divide-y divide-[#2D9B96]">
                 {cards.map((card) => (
-                  <tr key={card.id} className="hover:bg-gray-50">
+                  <tr key={card.id} className="hover:bg-[#1A2332]">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="w-12 h-16 bg-gray-200 rounded flex items-center justify-center">
+                      <div className="w-12 h-16 bg-[#0A0E1A] rounded flex items-center justify-center">
                         {card.image_url ? (
                           <img
-                            src={card.image_url}
+                            src={getCardThumbnailUrl(card.image_url)}
                             alt={card.name}
                             className="w-full h-full object-cover rounded"
                           />
                         ) : (
-                          <span className="text-xs text-gray-500">Sin imagen</span>
+                          <span className="text-xs text-[#707070]">Sin imagen</span>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{card.name}</div>
-                        <div className="text-sm text-gray-500">{card.expansion}</div>
+                        <div className="text-sm font-medium text-[#E8E8E8]">{card.name}</div>
+                        <div className="text-sm text-[#4ECDC4]">{card.expansion}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -280,10 +282,10 @@ export default function AdminCardsPage() {
                         {CARD_TYPE_LABELS[card.type]}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#E8E8E8]">
                       {card.cost !== null ? card.cost : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#E8E8E8]">
                       {card.attack !== null && card.defense !== null ? (
                         <span className="font-medium">
                           {card.attack}/{card.defense}
@@ -313,12 +315,12 @@ export default function AdminCardsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <Link
                         href={`/admin/cards/${card.id}/edit`}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-[#4ECDC4] hover:text-[#F4C430] mr-4 transition-colors"
                       >
                         Editar
                       </Link>
                       <button
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-400 hover:text-red-300 transition-colors"
                         onClick={async () => {
                           const result = await Swal.fire({
                             icon: 'warning',
@@ -328,7 +330,9 @@ export default function AdminCardsPage() {
                             confirmButtonColor: '#dc2626',
                             cancelButtonColor: '#6b7280',
                             confirmButtonText: 'Sí, eliminar',
-                            cancelButtonText: 'Cancelar'
+                            cancelButtonText: 'Cancelar',
+                            background: '#121825',
+                            color: '#E8E8E8'
                           })
                           if (result.isConfirmed) {
                             // TODO: Implementar eliminación
@@ -336,7 +340,9 @@ export default function AdminCardsPage() {
                               icon: 'info',
                               title: 'Pendiente',
                               text: 'Función de eliminación por implementar',
-                              confirmButtonColor: '#2563eb'
+                              confirmButtonColor: '#2563eb',
+                              background: '#121825',
+                              color: '#E8E8E8'
                             })
                           }
                         }}
@@ -352,12 +358,12 @@ export default function AdminCardsPage() {
 
           {cards.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">
+              <p className="text-[#4ECDC4] text-lg">
                 {selectedExpansion ? `No hay cartas en la expansión "${selectedExpansion}"` : 'No hay cartas registradas'}
               </p>
               <Link
                 href="/admin/cards/new"
-                className="inline-block mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-block mt-4 px-6 py-3 bg-[#F4C430] text-[#0A0E1A] rounded-lg hover:bg-[#FFD700] transition-colors signo-glow"
               >
                 Crear primera carta
               </Link>
@@ -367,31 +373,31 @@ export default function AdminCardsPage() {
 
         {/* Paginación */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-lg shadow">
+          <div className="bg-[#121825] border border-[#2D9B96] px-4 py-3 flex items-center justify-between sm:px-6 mt-4 rounded-lg shadow">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={!pagination.hasPrev}
-                className="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-[#E8E8E8] bg-[#0A0E1A] border border-[#2D9B96] hover:bg-[#1A2332] disabled:bg-[#0A0E1A] disabled:text-[#707070] disabled:cursor-not-allowed"
               >
                 Anterior
               </button>
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={!pagination.hasNext}
-                className="ml-3 relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="ml-3 relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-[#E8E8E8] bg-[#0A0E1A] border border-[#2D9B96] hover:bg-[#1A2332] disabled:bg-[#0A0E1A] disabled:text-[#707070] disabled:cursor-not-allowed"
               >
                 Siguiente
               </button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
-                  Mostrando <span className="font-medium">{(currentPage - 1) * limit + 1}</span> a{' '}
-                  <span className="font-medium">
+                <p className="text-sm text-[#4ECDC4]">
+                  Mostrando <span className="font-medium text-[#F4C430]">{(currentPage - 1) * limit + 1}</span> a{' '}
+                  <span className="font-medium text-[#F4C430]">
                     {Math.min(currentPage * limit, pagination.totalCount)}
                   </span>{' '}
-                  de <span className="font-medium">{pagination.totalCount}</span> resultados
+                  de <span className="font-medium text-[#F4C430]">{pagination.totalCount}</span> resultados
                 </p>
               </div>
               <div>
@@ -399,7 +405,7 @@ export default function AdminCardsPage() {
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={!pagination.hasPrev}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-[#2D9B96] bg-[#0A0E1A] text-sm font-medium text-[#4ECDC4] hover:bg-[#1A2332] disabled:bg-[#0A0E1A] disabled:text-[#707070] disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">Anterior</span>
                     <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -419,8 +425,8 @@ export default function AdminCardsPage() {
                         onClick={() => handlePageChange(pageNumber)}
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           pageNumber === currentPage
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            ? 'z-10 bg-[#F4C430] border-[#F4C430] text-[#0A0E1A]'
+                            : 'bg-[#0A0E1A] border-[#2D9B96] text-[#4ECDC4] hover:bg-[#1A2332]'
                         }`}
                       >
                         {pageNumber}
@@ -431,7 +437,7 @@ export default function AdminCardsPage() {
                   <button
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={!pagination.hasNext}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-[#2D9B96] bg-[#0A0E1A] text-sm font-medium text-[#4ECDC4] hover:bg-[#1A2332] disabled:bg-[#0A0E1A] disabled:text-[#707070] disabled:cursor-not-allowed"
                   >
                     <span className="sr-only">Siguiente</span>
                     <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -444,6 +450,8 @@ export default function AdminCardsPage() {
           </div>
         )}
       </div>
+
+      <Footer />
     </div>
   )
 }

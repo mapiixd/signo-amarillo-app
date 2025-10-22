@@ -51,14 +51,50 @@ enum RarityType {
   SECRETA
 }
 
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String   // Hash de la contraseña
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  sessions  Session[]
+  decks     Deck[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
 model Deck {
   id          String   @id @default(cuid())
   name        String
   description String?
+  userId      String   // Dueño del deck
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relaciones
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   deckCards   DeckCard[]
 
   @@map("decks")

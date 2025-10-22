@@ -1,13 +1,17 @@
-# 🃏 Decks Imperio
+# ⭐ El Signo Amarillo
 
-Una aplicación web completa para gestionar barajas de **Mitos y Leyendas** en formato **Imperio**. Construida con Next.js 15, TypeScript, Tailwind CSS y Supabase.
+**Constructor de Mazos para formato Imperio**
+
+Una aplicación web completa para gestionar barajas de **Mitos y Leyendas** en formato **Imperio**. Inspirada en el universo de Carcosa y el Rey de Amarillo. Construida con Next.js 15, TypeScript, Tailwind CSS y Supabase.
 
 ## ✨ Características
 
 - 📚 **Colección de Cartas**: Explora todas las cartas disponibles con imágenes reales
 - 🛠️ **Constructor de Barajas**: Crea y personaliza tus propias decks
 - 📊 **Gestión de Decks**: Organiza y administra tus barajas guardadas
-- ⚙️ **Panel de Administración**: CRUD completo para gestionar cartas
+- 🔐 **Sistema de Autenticación**: Registro, login y roles (Usuario/Admin)
+- 👥 **Gestión de Usuarios**: Cada usuario puede crear sus propios mazos
+- ⚙️ **Panel de Administración**: CRUD completo para gestionar cartas (solo admin)
 - 🖼️ **Imágenes Reales**: Más de 2000 imágenes de cartas integradas
 - 🔄 **Base de Datos Escalables**: Supabase con PostgreSQL
 
@@ -17,6 +21,11 @@ Una aplicación web completa para gestionar barajas de **Mitos y Leyendas** en f
 
 Sigue las instrucciones en [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) para crear tu proyecto en Supabase.
 
+### 1.5. (Opcional) Configurar CDN para Imágenes
+
+Para servir las imágenes desde un CDN rápido y económico:
+- **Bunny.net**: Ver [`BUNNY_CDN_SETUP.md`](./BUNNY_CDN_SETUP.md) - Recomendado (~$2/mes para 2.7GB)
+
 ### 2. Instalar dependencias
 
 ```bash
@@ -25,12 +34,18 @@ npm install
 
 ### 3. Configurar variables de entorno
 
-Crea un archivo `.env.local` con tus credenciales de Supabase:
+Crea un archivo `.env.local` con tus credenciales de Supabase y autenticación:
 
 ```env
+# Base de datos
 DATABASE_URL="postgresql://postgres:[TU-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
+
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="[TU-ANON-KEY]"
+
+# Autenticación (JWT)
+JWT_SECRET="tu-clave-secreta-super-larga-y-segura-aqui"
 ```
 
 ### 4. Configurar la base de datos
@@ -55,13 +70,34 @@ npm run seed-cards
 npm run update-images
 ```
 
-### 5. Iniciar servidor de desarrollo
+### 5. Crear usuario administrador
+
+```bash
+npm run create-admin
+```
+
+Ingresa nombre de usuario, correo y contraseña para crear tu primer administrador.
+
+### 6. Iniciar servidor de desarrollo
 
 ```bash
 npm run dev
 ```
 
 Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+
+## 🔐 Sistema de Autenticación
+
+La aplicación incluye un sistema completo de autenticación:
+
+- **Registro** (`/register`) - Crea una cuenta nueva
+- **Login** (`/login`) - Inicia sesión
+- **Roles**: Usuario (por defecto) y Administrador
+- **Protección de rutas** - Middleware automático
+- **Sesiones JWT** - Cookies seguras con expiración de 7 días
+
+**Ver documentación completa**: [`AUTH_SETUP.md`](./AUTH_SETUP.md)  
+**Guía rápida**: [`AUTH_QUICKSTART.md`](./AUTH_QUICKSTART.md)
 
 ## 📁 Estructura del Proyecto
 
@@ -98,6 +134,12 @@ npm run db:push         # Sincronizar esquema con Supabase
 npm run db:studio       # Abrir Prisma Studio
 npm run seed-cards      # Poblar con cartas de ejemplo
 npm run update-images   # Asignar imágenes a cartas
+
+# Autenticación
+npm run create-admin    # Crear usuario administrador
+
+# CDN (opcional)
+npm run upload-to-bunny # Subir imágenes a Bunny.net CDN
 
 # Utilidades
 npm run lint            # Ejecutar ESLint
