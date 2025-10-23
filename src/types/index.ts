@@ -1,45 +1,54 @@
-import { Card, Deck, DeckCard, CardType, RarityType } from '@prisma/client'
+// Tipos de enumeración
+export type CardType = 'TALISMAN' | 'ARMA' | 'TOTEM' | 'ALIADO' | 'ORO'
+export type RarityType = 'VASALLO' | 'CORTESANO' | 'REAL' | 'MEGA_REAL' | 'ULTRA_REAL' | 'LEGENDARIA' | 'PROMO' | 'SECRETA'
 
 // Tipos que coinciden con la base de datos de Supabase
-export type SupabaseCard = {
+export type Card = {
   id: string
   name: string
-  type: 'TALISMAN' | 'ARMA' | 'TOTEM' | 'ALIADO' | 'ORO'
+  type: CardType
   cost: number | null
   attack: number | null
   defense: number | null
   description: string | null
   image_url: string | null
   image_file: string | null
-  rarity: 'VASALLO' | 'CORTESANO' | 'REAL' | 'MEGA_REAL' | 'ULTRA_REAL' | 'LEGENDARIA' | 'PROMO' | 'SECRETA'
+  rarity: RarityType
+  race: string | null
   expansion: string
   is_active: boolean
   created_at: string
   updated_at: string
 }
 
-export type SupabaseDeck = {
+export type Deck = {
   id: string
   name: string
   description: string | null
+  user_id: string
   created_at: string
   updated_at: string
 }
 
-export type SupabaseDeckCard = {
+export type DeckCard = {
   id: string
   deck_id: string
   card_id: string
   quantity: number
 }
 
-export type CardWithQuantity = SupabaseCard & {
+// Alias para compatibilidad
+export type SupabaseCard = Card
+export type SupabaseDeck = Deck
+export type SupabaseDeckCard = DeckCard
+
+export type CardWithQuantity = Card & {
   quantity: number
 }
 
-export type DeckWithCards = SupabaseDeck & {
-  deckCards: (SupabaseDeckCard & {
-    card: SupabaseCard
+export type DeckWithCards = Deck & {
+  deckCards: (DeckCard & {
+    card: Card
   })[]
 }
 

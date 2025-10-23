@@ -31,6 +31,7 @@ export default function LoginPage() {
         throw new Error(data.error || 'Error al iniciar sesión');
       }
 
+      // Mostrar mensaje de éxito
       await Swal.fire({
         icon: 'success',
         title: '¡Bienvenido!',
@@ -41,11 +42,13 @@ export default function LoginPage() {
         color: '#F4C430',
       });
 
-      // Redirigir y forzar recarga completa
-      router.push('/');
-      router.refresh();
-      // Forzar recarga completa de la página para actualizar el Navbar
+      // Esperar a que se complete el SweetAlert
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Forzar recarga completa para asegurar que la cookie se propague
+      // Esto es necesario en Next.js 14+ App Router
       window.location.href = '/';
+      
     } catch (error: any) {
       Swal.fire({
         icon: 'error',

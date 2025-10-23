@@ -1,7 +1,10 @@
-import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
-import prisma from './prisma';
+import { randomUUID } from 'crypto';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
@@ -14,17 +17,10 @@ export interface UserPayload {
 }
 
 /**
- * Hash de contraseña
+ * Crear cliente de Supabase
  */
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
-}
-
-/**
- * Verificar contraseña
- */
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+function getSupabaseClient() {
+  return createClient(supabaseUrl, supabaseKey);
 }
 
 /**
@@ -39,8 +35,14 @@ export function createToken(payload: UserPayload): string {
  */
 export function verifyToken(token: string): UserPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as UserPayload;
-  } catch (error) {
+    const decoded = jwt.verify(token, JWT_SECRET) as UserPayload;
+    console.log('verifyToken: Token verificado exitosamente para usuario:', decoded.username);
+    return decoded;
+  } catch (error: any) {
+    console.error('verifyToken: Error verificando token:', error.message);
+    if (error.name === 'TokenExpiredError') {
+      console.error('verifyToken: Token expirado en:', error.expiredAt);
+    }
     return null;
   }
 }
@@ -49,15 +51,23 @@ export function verifyToken(token: string): UserPayload | null {
  * Crear sesión en la base de datos
  */
 export async function createSession(userId: string, token: string) {
+  const supabase = getSupabaseClient();
   const expiresAt = new Date(Date.now() + SESSION_DURATION);
+  const sessionId = randomUUID();
   
-  return prisma.session.create({
-    data: {
-      userId,
+  const { data, error } = await supabase
+    .from('sessions')
+    .insert({
+      id: sessionId,
+      userId: userId,
       token,
-      expiresAt,
-    },
-  });
+      expiresAt: expiresAt.toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -83,34 +93,44 @@ export async function getCurrentSession() {
 
   // Verificar si la sesión existe en la BD y no ha expirado
   console.log('getCurrentSession: Buscando sesión en BD...');
-  const session = await prisma.session.findUnique({
-    where: { token },
-    include: { user: true },
-  });
+  const supabase = getSupabaseClient();
+  
+  const { data: session, error } = await supabase
+    .from('sessions')
+    .select(`
+      *,
+      users (*)
+    `)
+    .eq('token', token)
+    .single();
 
   console.log('getCurrentSession: Sesión encontrada en BD:', !!session);
-  if (session) {
-    console.log('getCurrentSession: Sesión expira en:', session.expiresAt);
-    console.log('getCurrentSession: Fecha actual:', new Date());
-    console.log('getCurrentSession: Sesión expirada:', session.expiresAt < new Date());
-  }
-
-  if (!session || session.expiresAt < new Date()) {
-    // Sesión expirada o inválida
-    console.log('getCurrentSession: Sesión inválida o expirada');
-    if (session) {
-      await prisma.session.delete({ where: { id: session.id } });
-    }
+  if (error || !session) {
+    console.log('getCurrentSession: Error o sesión no encontrada:', error);
     return null;
   }
 
-  console.log('getCurrentSession: Sesión válida, retornando usuario:', session.user.username);
+  const expiresAt = new Date(session.expiresAt);
+  console.log('getCurrentSession: Sesión expira en:', expiresAt);
+  console.log('getCurrentSession: Fecha actual:', new Date());
+  console.log('getCurrentSession: Sesión expirada:', expiresAt < new Date());
+
+  if (expiresAt < new Date()) {
+    // Sesión expirada
+    console.log('getCurrentSession: Sesión expirada, eliminando...');
+    await supabase.from('sessions').delete().eq('id', session.id);
+    return null;
+  }
+
+  const user = Array.isArray(session.users) ? session.users[0] : session.users;
+  
+  console.log('getCurrentSession: Sesión válida, retornando usuario:', user.username);
   return {
     user: {
-      id: session.user.id,
-      username: session.user.username,
-      email: session.user.email,
-      role: session.user.role,
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
     },
     session,
   };
@@ -121,9 +141,34 @@ export async function getCurrentSession() {
  */
 export async function deleteSession(token: string) {
   try {
-    await prisma.session.delete({ where: { token } });
+    const supabase = getSupabaseClient();
+    await supabase.from('sessions').delete().eq('token', token);
   } catch (error) {
     // Sesión no encontrada, ignorar
+  }
+}
+
+/**
+ * Limpiar sesiones expiradas de la base de datos
+ * Esta función puede ser llamada periódicamente para mantener la BD limpia
+ */
+export async function cleanExpiredSessions() {
+  try {
+    const supabase = getSupabaseClient();
+    const now = new Date().toISOString();
+    
+    const { error } = await supabase
+      .from('sessions')
+      .delete()
+      .lt('expiresAt', now);
+    
+    if (error) {
+      console.error('Error limpiando sesiones expiradas:', error);
+    } else {
+      console.log('Sesiones expiradas limpiadas exitosamente');
+    }
+  } catch (error) {
+    console.error('Error en cleanExpiredSessions:', error);
   }
 }
 

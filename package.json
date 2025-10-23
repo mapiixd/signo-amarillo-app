@@ -7,11 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset",
     "create-admin": "tsx src/lib/createAdmin.ts",
     "update-images": "tsx src/lib/updateImages.ts",
     "seed-cards": "tsx src/lib/seedCards.ts",
@@ -21,10 +16,11 @@
     "import-excel": "tsx src/lib/importExcel.ts",
     "reset-import-all": "tsx src/lib/resetAndImportAll.ts",
     "upload-to-bunny": "tsx src/lib/uploadToBunny.ts",
-    "test-bunny-cdn": "tsx src/lib/testBunnyCDN.ts"
+    "test-bunny-cdn": "tsx src/lib/testBunnyCDN.ts",
+    "update-races": "tsx src/lib/updateRaces.ts",
+    "fix-multi-race": "tsx src/lib/fixMultiRaceCards.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.16.3",
     "@supabase/supabase-js": "^2.74.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -32,7 +28,6 @@
     "dotenv": "^17.2.3",
     "jsonwebtoken": "^9.0.2",
     "next": "15.5.4",
-    "prisma": "^6.16.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sweetalert2": "^11.25.0",

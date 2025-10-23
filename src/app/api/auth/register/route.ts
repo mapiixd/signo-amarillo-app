@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { hashPassword, createToken, createSession } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js';
+import { createToken, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import bcrypt from 'bcryptjs';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,16 +38,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar si el usuario ya existe
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username },
-        ],
-      },
-    });
+    const { data: existingUsers } = await supabase
+      .from('users')
+      .select('*')
+      .or(`email.eq.${email},username.eq.${username}`)
+      .limit(1);
 
-    if (existingUser) {
+    if (existingUsers && existingUsers.length > 0) {
+      const existingUser = existingUsers[0];
       if (existingUser.email === email) {
         return NextResponse.json(
           { error: 'El correo ya está registrado' },
@@ -58,17 +61,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash de la contraseña
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Crear usuario
-    const user = await prisma.user.create({
-      data: {
+    const { data: user, error: insertError } = await supabase
+      .from('users')
+      .insert({
         username,
         email,
         password: hashedPassword,
         role: 'USER', // Por defecto es USER
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (insertError || !user) {
+      throw insertError;
+    }
 
     // Crear token y sesión
     const token = createToken({

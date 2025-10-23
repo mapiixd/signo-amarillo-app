@@ -3,8 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card as CardType } from '@prisma/client'
-import { CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
+import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
 

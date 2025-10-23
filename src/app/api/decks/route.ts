@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
+import { requireAuth } from '@/lib/auth'
 
 // Cargar variables de entorno
 config({ path: '.env' })
@@ -9,13 +10,16 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// GET /api/decks - Obtener todas las barajas
+// GET /api/decks - Obtener todas las barajas del usuario autenticado
 export async function GET() {
   try {
-    // Obtener decks con sus cartas relacionadas
+    const user = await requireAuth()
+    
+    // Obtener solo los decks del usuario autenticado
     const { data: decks, error: decksError } = await supabase
       .from('decks')
       .select('*')
+      .eq('userId', user.id)
       .order('updated_at', { ascending: false })
 
     if (decksError) {
@@ -60,8 +64,16 @@ export async function GET() {
     )
 
     return NextResponse.json(decksWithCards)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching decks:', error)
+    
+    if (error.message === 'No autenticado') {
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'Error al obtener las barajas' },
       { status: 500 }
@@ -72,8 +84,10 @@ export async function GET() {
 // POST /api/decks - Crear una nueva baraja
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth()
+    
     const body = await request.json()
-    const { name, description, cards } = body
+    const { name, description, cards, is_public } = body
 
     if (!name) {
       return NextResponse.json(
@@ -82,12 +96,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear el deck
+    // Crear el deck asociado al usuario autenticado
     const { data: deck, error: deckError } = await supabase
       .from('decks')
       .insert({
         name,
-        description
+        description,
+        userId: user.id,
+        is_public: is_public || false
       })
       .select()
       .single()
@@ -146,8 +162,16 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(deckWithCards, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating deck:', error)
+    
+    if (error.message === 'No autenticado') {
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'Error al crear la baraja' },
       { status: 500 }

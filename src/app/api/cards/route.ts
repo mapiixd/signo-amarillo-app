@@ -103,19 +103,41 @@ export async function GET(request: NextRequest) {
 
     const cards = allCards
 
-    // Ordenar las cartas por expansión (usando el orden de la tabla) y luego por image_file (edid)
+    // Orden de rareza (de mayor a menor)
+    const rarityOrder: Record<string, number> = {
+      'PROMO': 1,
+      'SECRETA': 2,
+      'LEGENDARIA': 3,
+      'ULTRA_REAL': 4,
+      'MEGA_REAL': 5,
+      'REAL': 6,
+      'CORTESANO': 7,
+      'VASALLO': 8
+    }
+
+    // Ordenar las cartas por expansión (INVERSO, del mayor al menor), edid y luego por rareza
     const sortedCards = cards?.sort((a, b) => {
       const orderA = expansionOrder.get(a.expansion) ?? 999
       const orderB = expansionOrder.get(b.expansion) ?? 999
       
+      // Ordenar expansiones en orden INVERSO (mayor a menor)
       if (orderA !== orderB) {
-        return orderA - orderB
+        return orderB - orderA  // Invertido
       }
       
       // Si están en la misma expansión, ordenar por image_file (edid)
-      const edidA = parseInt(a.image_file?.replace('.png', '') || '999')
-      const edidB = parseInt(b.image_file?.replace('.png', '') || '999')
-      return edidA - edidB
+      const edidA = parseInt(a.image_file?.replace('.png', '') || '999999')
+      const edidB = parseInt(b.image_file?.replace('.png', '') || '999999')
+      
+      if (edidA !== edidB) {
+        return edidA - edidB
+      }
+      
+      // Si tienen el mismo edid, ordenar por rareza
+      const rarityA = rarityOrder[a.rarity] ?? 999
+      const rarityB = rarityOrder[b.rarity] ?? 999
+      
+      return rarityA - rarityB
     })
 
     // Filtrar duplicados por nombre, manteniendo solo la primera versión (primera en el orden)

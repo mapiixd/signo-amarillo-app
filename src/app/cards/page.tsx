@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Card as CardType } from '@prisma/client'
+import { Card as CardType } from '@/types'
 import { Card } from '@/components/Card'
 import Footer from '@/components/Footer'
 

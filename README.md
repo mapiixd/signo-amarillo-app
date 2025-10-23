@@ -37,9 +37,6 @@ npm install
 Crea un archivo `.env.local` con tus credenciales de Supabase y autenticación:
 
 ```env
-# Base de datos
-DATABASE_URL="postgresql://postgres:[TU-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
-
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="[TU-ANON-KEY]"
@@ -57,12 +54,6 @@ npm run setup
 
 **Opción B: Setup manual**
 ```bash
-# Generar cliente Prisma
-npx prisma generate
-
-# Crear tablas en Supabase
-npx prisma db push
-
 # Poblar con cartas iniciales
 npm run seed-cards
 
@@ -103,9 +94,6 @@ La aplicación incluye un sistema completo de autenticación:
 
 ```
 decks-imperio/
-├── prisma/
-│   ├── schema.prisma          # Esquema de base de datos
-│   └── seed.ts               # Datos iniciales
 ├── public/
 │   └── cards/                # Imágenes de cartas organizadas por expansión
 ├── src/
@@ -130,8 +118,6 @@ npm run build           # Construir para producción
 npm run start           # Servidor de producción
 
 # Base de datos
-npm run db:push         # Sincronizar esquema con Supabase
-npm run db:studio       # Abrir Prisma Studio
 npm run seed-cards      # Poblar con cartas de ejemplo
 npm run update-images   # Asignar imágenes a cartas
 
@@ -166,7 +152,7 @@ npm run lint            # Ejecutar ESLint
 ## 🔧 Tecnologías
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes, Prisma ORM
+- **Backend**: Next.js API Routes, Supabase
 - **Base de datos**: Supabase (PostgreSQL)
 - **Despliegue**: Vercel (recomendado)
 
