@@ -3,19 +3,49 @@
  * Soporta múltiples CDNs (Bunny.net, Cloudflare, etc.)
  */
 
-export function getCardImageUrl(imagePath: string): string {
+// Mapeo de expansiones a rutas de carpetas
+const EXPANSION_TO_PATH: Record<string, string> = {
+  'Amenaza Kaiju': '/cards/amenazakaiju/',
+  'Bestiarium': '/cards/bestiarium/',
+  'Cenizas de Fuego': '/cards/cenizas_de_fuego/',
+  'Escuadron Mecha': '/cards/escuadronmecha/',
+  'Espiritu Samurai': '/cards/espiritu_samurai/',
+  'Giger': '/cards/giger/',
+  'Hielo Inmortal': '/cards/hielo_inmortal/',
+  'Libertadores': '/cards/libertadores/',
+  'Lootbox 2024': '/cards/lootbox_2024/',
+  'Napoleon': '/cards/napoleon/',
+  'Onyria': '/cards/onyria/',
+  'Raciales Imp 2024': '/cards/raciales_imp_2024/',
+  'Secretos Arcanos': '/cards/secretos_arcanos/',
+  'Zodiaco': '/cards/zodiaco/'
+}
+
+export function getCardImageUrl(imageFile: string, expansion?: string): string {
   const cdnUrl = process.env.NEXT_PUBLIC_BUNNY_CDN_URL
+  
+  // Si se proporciona expansión, construir la ruta completa
+  let fullPath = imageFile
+  if (expansion && EXPANSION_TO_PATH[expansion]) {
+    // Si imageFile no incluye la carpeta, agregarla
+    if (!imageFile.includes('/cards/')) {
+      fullPath = `${EXPANSION_TO_PATH[expansion]}${imageFile}`
+    }
+  }
   
   // Si no hay CDN configurado, usar ruta local
   if (!cdnUrl) {
-    return imagePath
+    return fullPath
   }
   
   // Limpiar la ruta (remover slash inicial si existe)
-  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath
+  const cleanPath = fullPath.startsWith('/') ? fullPath.slice(1) : fullPath
+  
+  // Convertir la extensión a .webp si es una imagen
+  const webpPath = cleanPath.replace(/\.(png|jpg|jpeg)$/i, '.webp')
   
   // Construir URL completa del CDN
-  return `${cdnUrl}/${cleanPath}`
+  return `${cdnUrl}/${webpPath}`
 }
 
 /**
