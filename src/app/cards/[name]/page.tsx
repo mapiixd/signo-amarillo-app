@@ -115,10 +115,10 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Columna izquierda - Imagen grande */}
           <div className="lg:col-span-1">
-            <div className="sticky top-8">
+            <div className="lg:sticky lg:top-8">
               <div className="bg-[#121825] rounded-xl shadow-lg border-2 border-[#2D9B96] overflow-hidden border-mystic">
                 {card.image_url ? (
                   <img
@@ -137,12 +137,12 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
           </div>
 
           {/* Columna derecha - Información */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Información principal */}
-            <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6 border-mystic">
-              <h2 className="text-2xl font-bold text-[#F4C430] mb-6">Información de la Carta</h2>
+            <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-4 sm:p-6 border-mystic">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#F4C430] mb-4 sm:mb-6">Información de la Carta</h2>
               
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-[#4ECDC4] mb-2">Tipo</label>
                   <span className={`inline-block px-4 py-2 rounded-lg border-2 font-medium ${getTypeColor(card.type)}`}>
@@ -187,15 +187,15 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
 
             {/* Otras versiones */}
             {cards.length > 1 && (
-              <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6 border-mystic">
-                <h2 className="text-2xl font-bold text-[#F4C430] mb-4">
+              <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-4 sm:p-6 border-mystic">
+                <h2 className="text-xl sm:text-2xl font-bold text-[#F4C430] mb-3 sm:mb-4">
                   Versiones e Ilustraciones ({cards.length})
                 </h2>
-                <p className="text-[#A0A0A0] mb-6">
+                <p className="text-[#A0A0A0] mb-4 sm:mb-6 text-sm sm:text-base">
                   Esta carta tiene {cards.length} versiones diferentes. Haz clic en una para verla en detalle.
                 </p>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {cards.map((version, index) => {
                     const rarityColor = getRarityColor(version.rarity)
                     return (

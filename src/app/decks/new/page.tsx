@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Swal from 'sweetalert2'
 import { Card as CardType, CARD_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
+import { getCardBanStatus, isCardBanned, getMaxCopies, getBanStatusIcon, getBanStatusLabel, type FormatType } from '@/lib/banlist'
 import Footer from '@/components/Footer'
 
 interface SelectedCard {
@@ -24,7 +25,7 @@ export default function NewDeckPage() {
   const raceParam = searchParams.get('race')
   
   const [name, setName] = useState('')
-  const [isPublic, setIsPublic] = useState(false)
+  const [isPublic, setIsPublic] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cards, setCards] = useState<CardType[]>([])
   const [expansions, setExpansions] = useState<Expansion[]>([])
@@ -35,7 +36,12 @@ export default function NewDeckPage() {
   const [expansionFilter, setExpansionFilter] = useState<string>('Todas')
   const [deckRace, setDeckRace] = useState<string>(raceParam || '')
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'main' | 'sideboard'>('main')
+  const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
+  const [selectedCardForView, setSelectedCardForView] = useState<CardType | null>(null)
+  
+  // Referencias para auto-scroll
+  const mainDeckScrollRef = useRef<HTMLDivElement>(null)
+  const sidedeckScrollRef = useRef<HTMLDivElement>(null)
 
   // Redirigir si no hay raza seleccionada
   useEffect(() => {
@@ -48,6 +54,20 @@ export default function NewDeckPage() {
     fetchCards()
     fetchExpansions()
   }, [])
+
+  // Auto-scroll cuando se agregan cartas al mazo principal
+  useEffect(() => {
+    if (mainDeckScrollRef.current && activeTab === 'main') {
+      mainDeckScrollRef.current.scrollTop = mainDeckScrollRef.current.scrollHeight
+    }
+  }, [selectedCards, activeTab])
+
+  // Auto-scroll cuando se agregan cartas al sidedeck
+  useEffect(() => {
+    if (sidedeckScrollRef.current && activeTab === 'sidedeck') {
+      sidedeckScrollRef.current.scrollTop = sidedeckScrollRef.current.scrollHeight
+    }
+  }, [sideboard, activeTab])
 
   const fetchCards = async () => {
     try {
@@ -75,6 +95,13 @@ export default function NewDeckPage() {
     }
   }
 
+  // Helper para determinar si una carta es "sin raza"
+  const isRaceless = (card: CardType): boolean => {
+    if (card.type !== 'ALIADO') return false
+    const race = card.race?.trim() || ''
+    return race === '' || race === 'Sin Raza'
+  }
+
   const handleAddCard = (card: CardType, toSideboard: boolean = false) => {
     const currentDeck = toSideboard ? sideboard : selectedCards
     const setDeck = toSideboard ? setSideboard : setSelectedCards
@@ -82,17 +109,99 @@ export default function NewDeckPage() {
     const existing = currentDeck.find(sc => sc.card.id === card.id)
     const totalInBothDecks = getTotalCopies(card.id)
     
-    // Validar máximo 3 copias en total (mazo principal + refuerzo)
-    if (totalInBothDecks >= 3) {
+    // Calcular el total de cartas en el mazo actual
+    const currentTotal = currentDeck.reduce((sum, sc) => sum + sc.quantity, 0)
+    
+    // Validar límite de cartas en el mazo
+    if (!toSideboard && currentTotal >= 50) {
       Swal.fire({
         icon: 'warning',
-        title: 'Límite alcanzado',
-        text: 'No puedes tener más de 3 copias de la misma carta entre el mazo principal y el refuerzo',
+        title: 'Mazo completo',
+        text: 'El mazo principal ya tiene 50 cartas. No puedes agregar más.',
         confirmButtonColor: '#2D9B96',
         background: '#121825',
         color: '#F4C430'
       })
       return
+    }
+    
+    if (toSideboard && currentTotal >= 15) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sidedeck completo',
+        text: 'El sidedeck ya tiene 15 cartas. No puedes agregar más.',
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      return
+    }
+    
+    // Validar si la carta está prohibida en el formato
+    const format = 'Imperio Racial' as FormatType
+    if (isCardBanned(card.name, format)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Carta Prohibida',
+        text: `${card.name} está PROHIBIDA en el formato ${format}`,
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      return
+    }
+    
+    // Validar cartas únicas (que contengan "Única." en su descripción)
+    const isUniqueCard = card.description?.includes('Única.') || false
+    if (isUniqueCard && totalInBothDecks >= 1) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Carta Única',
+        text: `${card.name} es una carta única. Solo puedes tener 1 copia en tu mazo (incluyendo sidedeck).`,
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      return
+    }
+    
+    // Validar límite de copias según banlist (puede ser 1, 2 o 3)
+    const maxAllowed = getMaxCopies(card.name, format)
+    if (totalInBothDecks >= maxAllowed) {
+      const banStatus = getCardBanStatus(card.name, format)
+      const statusText = banStatus ? getBanStatusLabel(banStatus.status, banStatus.maxCopies) : ''
+      
+      Swal.fire({
+        icon: 'warning',
+        title: 'Límite alcanzado',
+        text: `No puedes tener más de ${maxAllowed} ${maxAllowed === 1 ? 'copia' : 'copias'} de ${card.name}${statusText ? ` (${statusText})` : ''}`,
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      return
+    }
+    
+    // Validar máximo 4 aliados sin raza en el mazo principal
+    if (!toSideboard && isRaceless(card)) {
+      const currentRacelessAllies = selectedCards
+        .filter(sc => isRaceless(sc.card))
+        .reduce((sum, sc) => sum + sc.quantity, 0)
+      
+      // Verificar si agregar esta carta excederá el límite de 4
+      const newTotal = currentRacelessAllies + 1
+      
+      if (newTotal > 4) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Límite alcanzado',
+          text: 'No puedes tener más de 4 aliados sin raza en el mazo principal',
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430'
+        })
+        return
+      }
     }
     
     if (existing) {
@@ -153,12 +262,12 @@ export default function NewDeckPage() {
       return
     }
 
-    // Validar restricciones del mazo de refuerzo
+    // Validar restricciones del sidedeck
     const sideboardError = validateSideboard()
     if (sideboardError) {
       Swal.fire({
         icon: 'error',
-        title: 'Error en el mazo de refuerzo',
+        title: 'Error en el sidedeck',
         text: sideboardError,
         confirmButtonColor: '#2D9B96',
         background: '#121825',
@@ -177,8 +286,13 @@ export default function NewDeckPage() {
         },
         body: JSON.stringify({
           name,
+          race: deckRace,
           is_public: isPublic,
           cards: selectedCards.map(sc => ({
+            id: sc.card.id,
+            quantity: sc.quantity
+          })),
+          sideboard: sideboard.map(sc => ({
             id: sc.card.id,
             quantity: sc.quantity
           }))
@@ -242,7 +356,7 @@ export default function NewDeckPage() {
     
     // Validar máximo 4 aliados sin raza (race === null o vacío)
     const alliesWithoutRace = selectedCards
-      .filter(sc => sc.card.type === 'ALIADO' && (!sc.card.race || sc.card.race.trim() === ''))
+      .filter(sc => isRaceless(sc.card))
       .reduce((sum, sc) => sum + sc.quantity, 0)
     
     if (alliesWithoutRace > 4) {
@@ -255,37 +369,50 @@ export default function NewDeckPage() {
   const validateSideboard = (): string | null => {
     const totalSideboard = sideboard.reduce((sum, sc) => sum + sc.quantity, 0)
     
-    // Validar que el mazo de refuerzo tenga exactamente 15 cartas
+    // Validar que el sidedeck tenga exactamente 15 cartas
     if (totalSideboard > 0 && totalSideboard !== 15) {
-      return `El mazo de refuerzo debe tener exactamente 15 cartas si decides usarlo. Actualmente tiene ${totalSideboard}.`
+      return `El sidedeck debe tener exactamente 15 cartas si decides usarlo. Actualmente tiene ${totalSideboard}.`
     }
     
     return null
   }
 
-  const filteredCards = cards.filter(card => {
-    const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = typeFilter === 'Todas' || card.type === typeFilter
-    const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
-    
-    // Filtro por raza del mazo: Si es aliado, solo mostrar los de la raza del mazo o sin raza
-    let matchesRace = true
-    if (card.type === 'ALIADO') {
-      const cardRace = card.race?.trim() || ''
-      const hasRace = cardRace !== ''
+  const filteredCards = cards
+    .filter(card => {
+      const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesType = typeFilter === 'Todas' || card.type === typeFilter
+      const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
       
-      // Si el aliado tiene raza, debe CONTENER la raza del mazo (para soportar multi-raza)
-      if (hasRace) {
-        // Verificar si la raza de la carta contiene la raza del mazo
-        // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
-        matchesRace = cardRace.includes(deckRace)
+      // Filtro por raza del mazo: Si es aliado, solo mostrar los de la raza del mazo o sin raza
+      let matchesRace = true
+      if (card.type === 'ALIADO') {
+        const cardRace = card.race?.trim() || ''
+        
+        // Siempre incluir cartas "Sin Raza" o sin raza definida
+        if (cardRace === '' || cardRace === 'Sin Raza') {
+          matchesRace = true
+        } else {
+          // Si el aliado tiene raza específica, debe CONTENER la raza del mazo (para soportar multi-raza)
+          // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
+          matchesRace = cardRace.includes(deckRace)
+        }
       }
-      // Si el aliado no tiene raza, siempre se muestra (máximo 4 permitidos)
-    }
-    // Si no es aliado (Arma, Talismán, Tótem, Oro), siempre se muestra
-    
-    return matchesSearch && matchesType && matchesExpansion && matchesRace
-  })
+      // Si no es aliado (Arma, Talismán, Tótem, Oro), siempre se muestra
+      
+      return matchesSearch && matchesType && matchesExpansion && matchesRace
+    })
+    .sort((a, b) => {
+      // Ordenar por coste (ascendente)
+      const costA = a.cost ?? 999 // Cartas sin coste al final
+      const costB = b.cost ?? 999
+      
+      if (costA !== costB) {
+        return costA - costB
+      }
+      
+      // Si tienen el mismo coste, ordenar por nombre
+      return a.name.localeCompare(b.name)
+    })
 
   const totalCards = selectedCards.reduce((sum, sc) => sum + sc.quantity, 0)
   const totalSideboard = sideboard.reduce((sum, sc) => sum + sc.quantity, 0)
@@ -300,9 +427,13 @@ export default function NewDeckPage() {
   const totemCount = selectedCards.filter(sc => sc.card.type === 'TOTEM').reduce((sum, sc) => sum + sc.quantity, 0)
   const goldCount = selectedCards.filter(sc => sc.card.type === 'ORO').reduce((sum, sc) => sum + sc.quantity, 0)
   const allyWeaponTotemCount = allyCount + weaponCount + totemCount
-  const alliesWithoutRace = selectedCards.filter(sc => sc.card.type === 'ALIADO' && (!sc.card.race || sc.card.race.trim() === '')).reduce((sum, sc) => sum + sc.quantity, 0)
-  const avgCost = selectedCards.length > 0 
-    ? (selectedCards.reduce((sum, sc) => sum + (sc.card.cost || 0) * sc.quantity, 0) / totalCards).toFixed(2)
+  const alliesWithoutRace = selectedCards.filter(sc => isRaceless(sc.card)).reduce((sum, sc) => sum + sc.quantity, 0)
+  
+  // Calcular coste promedio excluyendo las cartas de ORO
+  const cardsWithCost = selectedCards.filter(sc => sc.card.type !== 'ORO')
+  const totalCardsWithCost = cardsWithCost.reduce((sum, sc) => sum + sc.quantity, 0)
+  const avgCost = totalCardsWithCost > 0 
+    ? (cardsWithCost.reduce((sum, sc) => sum + (sc.card.cost || 0) * sc.quantity, 0) / totalCardsWithCost).toFixed(2)
     : '0.00'
 
   if (loading) {
@@ -335,9 +466,9 @@ export default function NewDeckPage() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-6">
           {/* Panel Izquierdo - Selector de Cartas */}
-          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6">
+          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-3 sm:p-6">
             {/* Barra de búsqueda y filtros */}
             <div className="mb-6">
               <div className="relative mb-4">
@@ -354,7 +485,7 @@ export default function NewDeckPage() {
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   onClick={() => setTypeFilter('Todas')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  className={`px-3 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
                     typeFilter === 'Todas' 
                       ? 'bg-[#F4C430] text-[#0A0E1A]' 
                       : 'bg-[#1A2332] text-[#A0A0A0] hover:bg-[#2D9B96] hover:text-white'
@@ -366,7 +497,7 @@ export default function NewDeckPage() {
                   <button
                     key={type}
                     onClick={() => setTypeFilter(type)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    className={`px-3 py-2 rounded-lg font-medium transition-all text-sm sm:text-base ${
                       typeFilter === type 
                         ? 'bg-[#F4C430] text-[#0A0E1A]' 
                         : 'bg-[#1A2332] text-[#A0A0A0] hover:bg-[#2D9B96] hover:text-white'
@@ -377,7 +508,7 @@ export default function NewDeckPage() {
                     {type === 'TALISMAN' && '✨'} 
                     {type === 'TOTEM' && '🗿'} 
                     {type === 'ORO' && '💰'}
-                    {' '}{CARD_TYPE_LABELS[type as keyof typeof CARD_TYPE_LABELS] || type}
+                    <span className="hidden sm:inline">{' '}{CARD_TYPE_LABELS[type as keyof typeof CARD_TYPE_LABELS] || type}</span>
                   </button>
                 ))}
               </div>
@@ -403,23 +534,32 @@ export default function NewDeckPage() {
             </div>
 
             {/* Grid de cartas - Solo imágenes */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2 py-4 px-2 custom-scrollbar">
               {filteredCards.map(card => {
                 const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
                 const totalCopies = getTotalCopies(card.id)
+                const format = 'Imperio Racial' as FormatType
+                const banStatus = getCardBanStatus(card.name, format)
+                const isBanned = banStatus?.status === 'banned'
+                const isUniqueCard = card.description?.includes('Única.') || false
                 
                 return (
                   <div
                     key={card.id}
-                    className="relative group cursor-pointer"
-                    onClick={() => handleAddCard(card, activeTab === 'sideboard')}
+                    className="relative group"
                   >
-                    <div className="aspect-[3/4] bg-[#1A2332] rounded-lg overflow-hidden border-2 border-[#2D9B96] hover:border-[#F4C430] transition-all hover:scale-105 hover:shadow-lg hover:shadow-[#F4C430]/50">
+                    <div 
+                      className={`aspect-[2.5/3.5] bg-[#1A2332] rounded-lg overflow-hidden border-2 transition-all hover:scale-105 hover:shadow-xl relative ${
+                        isBanned 
+                          ? 'border-red-600 opacity-60 hover:border-red-500' 
+                          : 'border-[#2D9B96] hover:border-[#F4C430] hover:shadow-[#F4C430]/50'
+                      }`}
+                    >
                       {imageUrl ? (
                         <img
                           src={imageUrl}
                           alt={card.name}
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full object-contain ${isBanned ? 'grayscale' : ''}`}
                           loading="lazy"
                         />
                       ) : (
@@ -427,20 +567,72 @@ export default function NewDeckPage() {
                           Sin imagen
                         </div>
                       )}
+                      
+                      {/* Marca de prohibida */}
+                      {isBanned && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
+                          <span className="text-5xl">⛔</span>
+                        </div>
+                      )}
                     </div>
+                    
+                    {/* Badge de carta única */}
+                    {isUniqueCard && (
+                      <div className="absolute -top-1 -left-1 sm:-top-2 sm:-left-2 bg-purple-600 text-white rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm shadow-lg border-2 border-purple-400 z-20" title="Carta Única - Máximo 1 copia">
+                        ⭐
+                      </div>
+                    )}
+                    
+                    {/* Badge de banlist (limitada) */}
+                    {banStatus && banStatus.status !== 'banned' && !isUniqueCard && (
+                      <div className="absolute -top-1 -left-1 sm:-top-2 sm:-left-2 bg-yellow-500 text-black rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm shadow-lg border-2 border-yellow-600 z-20" title={getBanStatusLabel(banStatus.status, banStatus.maxCopies)}>
+                        {getBanStatusIcon(banStatus.status)}
+                      </div>
+                    )}
                     
                     {/* Badge de cantidad total (principal + refuerzo) */}
                     {totalCopies > 0 && (
-                      <div className="absolute -top-2 -right-2 bg-[#F4C430] text-[#0A0E1A] rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm shadow-lg border-2 border-[#2D9B96]">
+                      <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-[#F4C430] text-[#0A0E1A] rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm shadow-lg border-2 border-[#2D9B96] z-20">
                         {totalCopies}
                       </div>
                     )}
 
-                    {/* Tooltip con nombre al hover */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-white text-xs font-semibold text-center truncate">
+                    {/* Nombre y botones siempre visibles */}
+                    <div className="mt-2 space-y-1">
+                      <p className={`text-[10px] sm:text-xs font-semibold text-center truncate px-1 ${
+                        isBanned ? 'text-red-400' : 'text-white'
+                      }`}>
+                        {isUniqueCard && <span className="mr-1 text-purple-400">⭐</span>}
+                        {banStatus && !isBanned && !isUniqueCard && <span className="mr-1">{getBanStatusIcon(banStatus.status)}</span>}
                         {card.name}
+                        {isUniqueCard && <span className="ml-1 text-purple-400">(1)</span>}
+                        {!isUniqueCard && banStatus && banStatus.maxCopies < 3 && !isBanned && (
+                          <span className="ml-1 text-yellow-400">({banStatus.maxCopies})</span>
+                        )}
                       </p>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleAddCard(card, activeTab === 'sidedeck')}
+                          disabled={isBanned}
+                          className={`flex-1 text-[10px] sm:text-xs py-1 sm:py-1.5 rounded transition-colors font-medium ${
+                            isBanned 
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                              : 'bg-[#2D9B96] hover:bg-[#4ECDC4] text-white'
+                          }`}
+                        >
+                          {isBanned ? '⛔ Prohibida' : '+ Agregar'}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedCardForView(card)
+                          }}
+                          className="px-2 sm:px-3 bg-[#1A2332] hover:bg-[#0A0E1A] text-[#4ECDC4] hover:text-[#F4C430] text-[10px] sm:text-xs py-1 sm:py-1.5 rounded transition-colors border border-[#2D9B96]"
+                          title="Ver carta"
+                        >
+                          👁️
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -455,7 +647,7 @@ export default function NewDeckPage() {
           </div>
 
           {/* Panel Derecho - Mazo Actual */}
-          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6 sticky top-4 max-h-[calc(100vh-100px)]">
+          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-3 sm:p-6 lg:sticky lg:top-4 max-h-[calc(100vh-50px)]">
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
               {/* Input nombre del mazo */}
               <div className="mb-4">
@@ -484,84 +676,65 @@ export default function NewDeckPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('sideboard')}
+                  onClick={() => setActiveTab('sidedeck')}
                   className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${
-                    activeTab === 'sideboard'
+                    activeTab === 'sidedeck'
                       ? 'bg-[#2D9B96] text-white'
                       : 'bg-[#1A2332] text-[#A0A0A0] hover:bg-[#0A0E1A]'
                   }`}
                 >
-                  Refuerzo ({totalSideboard}/15)
+                  Sidedeck ({totalSideboard}/15)
                 </button>
               </div>
 
               {/* Estadísticas del mazo principal */}
               {activeTab === 'main' && (
-                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-4 mb-4">
-                  <h3 className="text-[#F4C430] font-bold text-xl mb-3 text-center">
+                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-3 mb-3">
+                  <h3 className="text-[#F4C430] font-bold text-lg mb-2 text-center">
                     Total: {totalCards} / 50
                   </h3>
                   
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-1 text-xs">
                     <div className="flex items-center justify-between text-[#E8E8E8]">
-                      <span className="flex items-center gap-2">
-                        🗡️ <span className="text-[#2D9B96]">Aliados: {allyCount}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8]">
-                      <span className="flex items-center gap-2">
-                        ⚔️ <span className="text-[#2D9B96]">Armas: {weaponCount}</span>
-                      </span>
+                      <span>🗡️ Aliados: <span className="text-[#2D9B96]">{allyCount}</span></span>
+                      <span>⚔️ Armas: <span className="text-[#2D9B96]">{weaponCount}</span></span>
+                      <span>💰 Oros: <span className="text-[#F4C430]">{goldCount}</span></span>
                     </div>
                     <div className="flex items-center justify-between text-[#E8E8E8]">
-                      <span className="flex items-center gap-2">
-                        ✨ <span className="text-[#2D9B96]">Talismanes: {talismanCount}</span>
-                      </span>
+                      <span>✨ Talismanes: <span className="text-[#2D9B96]">{talismanCount}</span></span>
+                      <span>🗿 Tótems: <span className="text-[#2D9B96]">{totemCount}</span></span>
                     </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8]">
-                      <span className="flex items-center gap-2">
-                        🗿 <span className="text-[#2D9B96]">Tótems: {totemCount}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8]">
-                      <span className="flex items-center gap-2">
-                        💰 <span className="text-[#F4C430]">Oros: {goldCount}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8] pt-2 border-t border-[#2D9B96]">
-                      <span>Aliados+Armas+Tótems: <span className={allyWeaponTotemCount >= 17 ? 'text-[#2D9B96]' : 'text-[#E74860]'}>{allyWeaponTotemCount}</span></span>
-                      <span className="text-[#A0A0A0]">(Mín: 17)</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8]">
-                      <span>Aliados sin raza: <span className={alliesWithoutRace <= 4 ? 'text-[#2D9B96]' : 'text-[#E74860]'}>{alliesWithoutRace}</span></span>
-                      <span className="text-[#A0A0A0]">(Máx: 4)</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8] pt-2 border-t border-[#2D9B96]">
-                      <span>Costo Prom: {avgCost}</span>
+                    <div className="flex items-center justify-between text-[#E8E8E8] pt-1 border-t border-[#2D9B96] mt-1">
+                      <span>A+A+T: <span className={allyWeaponTotemCount >= 17 ? 'text-[#2D9B96]' : 'text-[#E74860]'}>{allyWeaponTotemCount}</span> <span className="text-[#A0A0A0] text-[10px]">(≥17)</span></span>
+                      <span>Sin raza: <span className={alliesWithoutRace <= 4 ? 'text-[#2D9B96]' : 'text-[#E74860]'}>{alliesWithoutRace}</span> <span className="text-[#A0A0A0] text-[10px]">(≤4)</span></span>
+                      <span>Costo: <span className="text-[#F4C430]">{avgCost}</span></span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Estadísticas del mazo de refuerzo */}
-              {activeTab === 'sideboard' && (
-                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-4 mb-4">
-                  <h3 className="text-[#F4C430] font-bold text-xl mb-3 text-center">
+              {/* Estadísticas del sidedeck */}
+              {activeTab === 'sidedeck' && (
+                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-3 mb-3">
+                  <h3 className="text-[#F4C430] font-bold text-lg mb-1 text-center">
                     Total: {totalSideboard} / 15
                   </h3>
-                  <p className="text-[#A0A0A0] text-sm text-center">
-                    El mazo de refuerzo es opcional y debe tener exactamente 15 cartas
+                  <p className="text-[#A0A0A0] text-xs text-center">
+                    Opcional - Debe tener exactamente 15 cartas
                   </p>
                 </div>
               )}
 
               {/* Lista de cartas seleccionadas */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar mb-4">
+              <div 
+                ref={activeTab === 'main' ? mainDeckScrollRef : sidedeckScrollRef}
+                className="flex-1 overflow-y-auto custom-scrollbar mb-4"
+              >
                 {(activeTab === 'main' ? selectedCards : sideboard).length > 0 ? (
                   <div className="space-y-2">
                     {(activeTab === 'main' ? selectedCards : sideboard).map(sc => {
                       const imageUrl = sc.card.image_url ? getCardImageUrl(sc.card.image_url) : null
-                      const isSideboard = activeTab === 'sideboard'
+                      const isSideboard = activeTab === 'sidedeck'
                       
                       return (
                         <div
@@ -597,6 +770,14 @@ export default function NewDeckPage() {
 
                           {/* Controles */}
                           <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCardForView(sc.card)}
+                              className="text-[#2D9B96] hover:text-[#4ECDC4] text-sm"
+                              title="Ver carta"
+                            >
+                              👁️
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleRemoveCard(sc.card.id, isSideboard)}
@@ -644,16 +825,21 @@ export default function NewDeckPage() {
                 )}
               </div>
 
-              {/* Toggle público */}
+              {/* Toggle privado */}
               <div className="mb-4">
                 <label className="flex items-center gap-3 cursor-pointer bg-[#1A2332] border border-[#2D9B96] rounded-lg p-3">
                   <input
                     type="checkbox"
-                    checked={isPublic}
-                    onChange={(e) => setIsPublic(e.target.checked)}
+                    checked={!isPublic}
+                    onChange={(e) => setIsPublic(!e.target.checked)}
                     className="w-5 h-5 accent-[#2D9B96]"
                   />
-                  <span className="text-[#E8E8E8]">Hacer este mazo público</span>
+                  <div className="flex-1">
+                    <span className="text-[#E8E8E8] font-semibold">Hacer este mazo privado</span>
+                    <p className="text-xs text-[#A0A0A0] mt-1">
+                      {isPublic ? '🌍 Tu mazo será visible públicamente' : '🔒 Solo tú podrás ver este mazo'}
+                    </p>
+                  </div>
                 </label>
               </div>
 
@@ -679,6 +865,117 @@ export default function NewDeckPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal para ver detalles de la carta */}
+      {selectedCardForView && (
+        <div 
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedCardForView(null)}
+        >
+          <div 
+            className="bg-[#121825] border-2 border-[#2D9B96] rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="sticky top-0 bg-[#121825] border-b border-[#2D9B96] p-4 flex justify-between items-center z-10">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#F4C430]">
+                {selectedCardForView.name}
+              </h2>
+              <button
+                onClick={() => setSelectedCardForView(null)}
+                className="text-[#4ECDC4] hover:text-[#F4C430] text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#1A2332] transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Contenido del modal */}
+            <div className="p-4 sm:p-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Imagen de la carta */}
+                <div className="flex justify-center">
+                  <div className="w-full max-w-md">
+                    {selectedCardForView.image_url ? (
+                      <img
+                        src={getCardImageUrl(selectedCardForView.image_url)}
+                        alt={selectedCardForView.name}
+                        className="w-full h-auto rounded-lg border-2 border-[#2D9B96] shadow-lg"
+                      />
+                    ) : (
+                      <div className="aspect-[3/4] bg-[#1A2332] rounded-lg border-2 border-[#2D9B96] flex items-center justify-center">
+                        <span className="text-[#4ECDC4]">Sin imagen</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Información de la carta */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Tipo</label>
+                    <span className="inline-block px-3 py-1 rounded-lg bg-[#2D9B96] text-white text-sm">
+                      {CARD_TYPE_LABELS[selectedCardForView.type as keyof typeof CARD_TYPE_LABELS]}
+                    </span>
+                  </div>
+
+                  {selectedCardForView.cost !== null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Coste</label>
+                      <div className="text-2xl font-bold text-[#F4C430]">{selectedCardForView.cost}</div>
+                    </div>
+                  )}
+
+                  {selectedCardForView.attack !== null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Fuerza</label>
+                      <div className="text-2xl font-bold text-[#E74860]">{selectedCardForView.attack}</div>
+                    </div>
+                  )}
+
+                  {selectedCardForView.defense !== null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Defensa</label>
+                      <div className="text-2xl font-bold text-[#4ECDC4]">{selectedCardForView.defense}</div>
+                    </div>
+                  )}
+
+                  {selectedCardForView.race && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Raza</label>
+                      <div className="text-lg text-[#E8E8E8]">{selectedCardForView.race}</div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Expansión</label>
+                    <div className="text-sm text-[#E8E8E8]">{selectedCardForView.expansion}</div>
+                  </div>
+
+                  {selectedCardForView.description && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Habilidad</label>
+                      <p className="text-[#A0A0A0] text-sm leading-relaxed">{selectedCardForView.description}</p>
+                    </div>
+                  )}
+
+                  {/* Botón para agregar desde el modal */}
+                  <div className="pt-4 border-t border-[#2D9B96]">
+                    <button
+                      onClick={() => {
+                        handleAddCard(selectedCardForView, activeTab === 'sidedeck')
+                        setSelectedCardForView(null)
+                      }}
+                      className="w-full px-6 py-3 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-all font-semibold"
+                    >
+                      + Agregar al mazo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
 

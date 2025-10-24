@@ -87,7 +87,7 @@ export default function FormatSelectPage() {
                         • 15 cartas en el mazo de refuerzo (opcional)<br/>
                         • Mínimo 17 cartas entre Aliados, Armas y Tótems<br/>
                         • Solo aliados de una raza específica<br/>
-                        • Máximo 4 aliados sin raza
+                        • Máximo 4 aliados sin raza (solo en el mazo principal)
                       </div>
                     </div>
                     {selectedFormat === 'racial' && (
@@ -105,9 +105,13 @@ export default function FormatSelectPage() {
                         Tríadas
                       </h3>
                       <p className="text-[#707070] mb-2">
-                        Construye tu mazo con grupos de tres aliados que compartan características comunes.
+                        Construye tu mazo en una de las 3 facciones.
                       </p>
                       <div className="text-[#707070] text-sm">
+                        <strong>Tenebris:</strong> Bestia, Dragón, Sombra<br/>
+                        <strong>Paladín:</strong> Caballero, Guerrero, Héroe<br/>
+                        <strong>Desafiante:</strong> Eterno, Faerie, Sacerdote<br/>
+                        <br/>
                         Próximamente...
                       </div>
                     </div>
@@ -150,16 +154,16 @@ export default function FormatSelectPage() {
                   </h2>
                 </div>
 
-                <p className="text-[#A0A0A0] mb-6">
+                <p className="text-[#A0A0A0] mb-6 text-sm sm:text-base">
                   Elige la raza que definirá los aliados de tu mazo
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {races.map((race) => (
                     <button
                       key={race.name}
                       onClick={() => setSelectedRace(race.name)}
-                      className={`p-4 rounded-lg border-2 transition-all text-left hover:scale-105 relative overflow-hidden ${
+                      className={`p-3 sm:p-4 rounded-lg border-2 transition-all text-left hover:scale-105 relative overflow-hidden ${
                         selectedRace === race.name
                           ? 'bg-[#2D9B96]/20 border-[#2D9B96] shadow-lg shadow-[#2D9B96]/50'
                           : 'bg-[#1A2332] border-[#2D9B96]/50 hover:border-[#2D9B96]'
@@ -167,7 +171,7 @@ export default function FormatSelectPage() {
                     >
                       <div className="flex flex-col items-center text-center">
                         {/* Imagen de la raza */}
-                         <div className="w-32 h-32 mb-3 rounded-full overflow-hidden border-2 border-[#2D9B96] flex items-center justify-center bg-[#0A0E1A]">
+                         <div className="w-20 h-20 sm:w-28 sm:h-28 lg:w-32 lg:h-32 mb-2 sm:mb-3 rounded-full overflow-hidden border-2 border-[#2D9B96] flex items-center justify-center bg-[#0A0E1A]">
                            <img
                              src={race.image}
                              alt={race.name || ''}
@@ -178,11 +182,11 @@ export default function FormatSelectPage() {
                              }`}
                            />
                          </div>
-                        <h3 className="text-xl font-bold text-[#F4C430]">
+                        <h3 className="text-base sm:text-lg lg:text-xl font-bold text-[#F4C430]">
                           {race.name}
                         </h3>
                         {selectedRace === race.name && (
-                          <div className="absolute top-2 right-2 bg-[#2D9B96] text-white rounded-full w-8 h-8 flex items-center justify-center text-xl">
+                          <div className="absolute top-2 right-2 bg-[#2D9B96] text-white rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center text-base sm:text-xl">
                             ✓
                           </div>
                         )}

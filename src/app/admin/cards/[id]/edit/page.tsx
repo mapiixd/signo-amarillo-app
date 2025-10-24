@@ -3,10 +3,23 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { SupabaseCard, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
+import { SupabaseCard, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, EXPANSIONS, RACES, EXPANSION_TO_PATH } from '@/types'
 import Swal from 'sweetalert2'
 import { getCardFullImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
+
+// Configuración de estilos para SweetAlert2
+const swalConfig = {
+  background: '#121825',
+  color: '#E8E8E8',
+  confirmButtonColor: '#F4C430',
+  cancelButtonColor: '#2D9B96',
+  customClass: {
+    popup: 'border-2 border-[#2D9B96]',
+    title: 'text-[#F4C430]',
+    htmlContainer: 'text-[#E8E8E8]'
+  }
+}
 
 interface CardFormData {
   name: string
@@ -18,6 +31,7 @@ interface CardFormData {
   imageFile: string
   rarity: string
   expansion: string
+  race: string[]
   isActive: boolean
 }
 
@@ -37,6 +51,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
     imageFile: '',
     rarity: 'COMUN',
     expansion: '',
+    race: [],
     isActive: false
   })
 
@@ -50,6 +65,12 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
       if (response.ok) {
         const cardData = await response.json()
         setCard(cardData)
+        // Parsear las razas correctamente
+        let races: string[] = []
+        if (cardData.race) {
+          races = cardData.race.split(',').map((r: string) => r.trim()).filter((r: string) => r.length > 0)
+        }
+
         setFormData({
           name: cardData.name || '',
           type: cardData.type || 'ALIADO',
@@ -60,24 +81,25 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
           imageFile: cardData.image_file || '',
           rarity: cardData.rarity || 'COMUN',
           expansion: cardData.expansion || '',
+          race: races,
           isActive: cardData.is_active || false
         })
       } else {
         await Swal.fire({
+          ...swalConfig,
           icon: 'error',
           title: 'Carta no encontrada',
-          text: 'La carta que buscas no existe',
-          confirmButtonColor: '#2563eb'
+          text: 'La carta que buscas no existe'
         })
         router.push('/admin/cards')
       }
     } catch (error) {
       console.error('Error fetching card:', error)
       await Swal.fire({
+        ...swalConfig,
         icon: 'error',
         title: 'Error',
-        text: 'Error al cargar la carta',
-        confirmButtonColor: '#2563eb'
+        text: 'Error al cargar la carta'
       })
     } finally {
       setLoading(false)
@@ -86,23 +108,43 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validar que los aliados tengan al menos una raza
+    if (formData.type === 'ALIADO' && formData.race.length === 0) {
+      await Swal.fire({
+        ...swalConfig,
+        icon: 'warning',
+        title: 'Raza requerida',
+        text: 'Los aliados deben tener al menos una raza asignada'
+      })
+      return
+    }
+
     setSaving(true)
 
     try {
+      // Convertir el array de razas a string separado por comas (solo para aliados)
+      const dataToSend = {
+        ...formData,
+        race: formData.type === 'ALIADO' && formData.race.length > 0 
+          ? formData.race.join(', ') 
+          : null
+      }
+
       const response = await fetch(`/api/admin/cards/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSend)
       })
 
       if (response.ok) {
         await Swal.fire({
+          ...swalConfig,
           icon: 'success',
           title: '¡Éxito!',
           text: 'Carta actualizada exitosamente',
-          confirmButtonColor: '#2563eb',
           timer: 2000,
           showConfirmButton: false
         })
@@ -110,19 +152,19 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
       } else {
         const error = await response.json()
         await Swal.fire({
+          ...swalConfig,
           icon: 'error',
           title: 'Error',
-          text: error.error || 'No se pudo actualizar la carta',
-          confirmButtonColor: '#2563eb'
+          text: error.error || 'No se pudo actualizar la carta'
         })
       }
     } catch (error) {
       console.error('Error updating card:', error)
       await Swal.fire({
+        ...swalConfig,
         icon: 'error',
         title: 'Error',
-        text: 'Error al actualizar la carta',
-        confirmButtonColor: '#2563eb'
+        text: 'Error al actualizar la carta'
       })
     } finally {
       setSaving(false)
@@ -130,7 +172,59 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   }
 
   const handleChange = (field: keyof CardFormData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const updates: Partial<CardFormData> = { [field]: value }
+      
+      // Auto-completar URL de imagen cuando se selecciona una expansión
+      if (field === 'expansion' && typeof value === 'string' && value) {
+        const basePath = EXPANSION_TO_PATH[value]
+        if (basePath) {
+          // Solo actualizar si la URL actual está vacía o es de otra expansión
+          const currentUrl = prev.imageUrl || ''
+          if (!currentUrl || !currentUrl.includes(basePath)) {
+            updates.imageUrl = basePath
+          }
+        }
+      }
+      
+      // Auto-copiar nombre del archivo cuando se escribe en la URL
+      if (field === 'imageUrl' && typeof value === 'string') {
+        const filename = value.split('/').pop()
+        if (filename && filename.includes('.')) {
+          updates.imageFile = filename
+        }
+      }
+      
+      // Limpiar coste cuando se selecciona ORO
+      if (field === 'type' && value === 'ORO') {
+        updates.cost = ''
+      }
+      
+      return { ...prev, ...updates }
+    })
+  }
+
+  const handleRaceToggle = (race: string) => {
+    setFormData(prev => {
+      const currentRaces = prev.race
+      if (currentRaces.includes(race)) {
+        // Remover la raza
+        return { ...prev, race: currentRaces.filter(r => r !== race) }
+      } else {
+        // Agregar la raza si no hay más de 3
+        if (currentRaces.length >= 3) {
+          Swal.fire({
+            ...swalConfig,
+            icon: 'warning',
+            title: 'Límite alcanzado',
+            text: 'Solo puedes seleccionar hasta 3 razas',
+            timer: 2000
+          })
+          return prev
+        }
+        return { ...prev, race: [...currentRaces, race] }
+      }
+    })
   }
 
   if (loading) {
@@ -246,20 +340,22 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                     </select>
                   </div>
 
-                  {/* Coste */}
-                  <div>
-                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                      Coste {formData.type === 'ORO' && <span className="text-[#4ECDC4] font-normal">(dejar vacío para oros)</span>}
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.cost}
-                      onChange={(e) => handleChange('cost', e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all"
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
+                  {/* Coste (no aplica para ORO) */}
+                  {formData.type !== 'ORO' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                        Coste
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.cost}
+                        onChange={(e) => handleChange('cost', e.target.value)}
+                        className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all"
+                        placeholder="0"
+                        min="0"
+                      />
+                    </div>
+                  )}
 
                   {/* Rareza */}
                   <div>
@@ -296,19 +392,62 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                     </div>
                   )}
 
+                  {/* Razas (solo para Aliados) */}
+                  {formData.type === 'ALIADO' && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                        Razas * (Selecciona hasta 3)
+                      </label>
+                      {formData.race.length === 0 && (
+                        <div className="mb-3 p-3 bg-yellow-900/20 border border-yellow-600/50 rounded-lg">
+                          <p className="text-sm text-yellow-400">
+                            ⚠️ Esta carta no tiene razas asignadas. Por favor selecciona al menos una raza.
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-3">
+                        {RACES.map((race) => {
+                          const isSelected = formData.race.includes(race)
+                          return (
+                            <button
+                              key={race}
+                              type="button"
+                              onClick={() => handleRaceToggle(race)}
+                              className={`px-4 py-2.5 rounded-lg border-2 transition-all font-medium ${
+                                isSelected
+                                  ? 'bg-[#F4C430] border-[#F4C430] text-[#0A0E1A]'
+                                  : 'bg-[#0A0E1A] border-[#2D9B96] text-[#E8E8E8] hover:border-[#F4C430]'
+                              }`}
+                            >
+                              {race}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {formData.race.length > 0 && (
+                        <p className="mt-2 text-sm text-[#4ECDC4]">
+                          Seleccionadas: {formData.race.join(', ')} ({formData.race.length}/3)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Expansión */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                       Expansión/Edición *
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={formData.expansion}
                       onChange={(e) => handleChange('expansion', e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all"
-                      placeholder="Ej: Cenizas de Fuego"
+                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
                       required
-                    />
+                    >
+                      <option value="">Selecciona una expansión</option>
+                      {EXPANSIONS.map((expansion) => (
+                        <option key={expansion} value={expansion}>{expansion}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Habilidad */}
@@ -323,6 +462,40 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                       className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all resize-none"
                       placeholder="Describe la habilidad o efecto de la carta..."
                     />
+                  </div>
+
+                  {/* URL de imagen */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                      URL de la imagen
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.imageUrl}
+                      onChange={(e) => handleChange('imageUrl', e.target.value)}
+                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all"
+                      placeholder="Ej: /cards/napoleon/230.png"
+                    />
+                    <p className="mt-1 text-xs text-[#4ECDC4]">
+                      Ruta completa de la imagen (ej: /cards/expansion/numero.png)
+                    </p>
+                  </div>
+
+                  {/* Archivo de imagen */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                      Nombre del archivo
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.imageFile}
+                      onChange={(e) => handleChange('imageFile', e.target.value)}
+                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] placeholder-[#707070] shadow-sm transition-all"
+                      placeholder="Ej: 230.png"
+                    />
+                    <p className="mt-1 text-xs text-[#4ECDC4]">
+                      Solo el nombre del archivo con extensión (ej: 230.png)
+                    </p>
                   </div>
 
                   {/* Estado completado */}

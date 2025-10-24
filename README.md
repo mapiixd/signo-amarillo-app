@@ -4,6 +4,8 @@
 
 Una aplicación web completa para gestionar barajas de **Mitos y Leyendas** en formato **Imperio**. Inspirada en el universo de Carcosa y el Rey de Amarillo. Construida con Next.js 15, TypeScript, Tailwind CSS y Supabase.
 
+> 🎉 **Nueva Migración JSONB:** Aplicación optimizada - 16x más rápida, 98.5% menos filas en BD. Ver [`EMPIEZA_AQUI.md`](./EMPIEZA_AQUI.md) para migrar.
+
 ## ✨ Características
 
 - 📚 **Colección de Cartas**: Explora todas las cartas disponibles con imágenes reales
@@ -139,15 +141,26 @@ npm run lint            # Ejecutar ESLint
 - **Imágenes**: Integradas automáticamente desde `/public/cards/`
 
 ### Baraja (Deck)
-- **Relación**: Many-to-many con cartas a través de DeckCard
-- **Campos**: Nombre, descripción, fecha de creación
+- **Estructura**: JSONB optimizada (ver [`DECK_STRUCTURE_JSONB.md`](./DECK_STRUCTURE_JSONB.md))
+- **Campos**: Nombre, descripción, raza, formato, cartas (JSONB), sideboard (JSONB)
+- **Ventajas**: 98% menos filas en BD, queries más rápidas, mejor escalabilidad
 
-## 🎯 Formato Imperio
+## 🎯 Formato Imperio Racial
 
-- **Barajas**: Mínimo 60 cartas
-- **Sin límites**: Cualquier cantidad de copias por carta
-- **Todas las expansiones**: Permitidas
-- **Énfasis**: Estrategia y sinergia
+### Mazo Principal (50 cartas exactas)
+- **Máximo 3 copias** por carta (excepto Oro: hasta 10)
+- **Solo aliados** de la raza seleccionada
+- **Máximo 4 aliados** sin raza
+
+### Mazo de Refuerzo (15 cartas exactas)
+- **Sideboard**: Cartas intercambiables entre partidas
+- **Máximo 3 copias** por carta (excepto Oro: hasta 10)
+- **Puede incluir** aliados de otras razas
+
+### Sistema de Banlist
+- ❌ **Prohibidas**: No permitidas en ningún formato
+- ⚠️ **Limitadas**: Máximo 1-2 copias según carta
+- Ver [`BANLIST_SYSTEM.md`](./BANLIST_SYSTEM.md) para lista completa
 
 ## 🔧 Tecnologías
 

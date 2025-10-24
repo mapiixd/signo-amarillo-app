@@ -59,6 +59,7 @@ export async function PUT(
       imageFile,
       rarity,
       expansion,
+      race,
       isActive
     } = body
 
@@ -82,6 +83,7 @@ export async function PUT(
         image_file: imageFile,
         rarity,
         expansion,
+        race: race || null,
         is_active: isActive || false
       })
       .eq('id', params.id)

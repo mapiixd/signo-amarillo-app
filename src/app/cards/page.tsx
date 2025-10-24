@@ -143,14 +143,14 @@ export default function CardsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A]">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#F4C430] mb-6">Colección de Cartas</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#F4C430] mb-4 sm:mb-6">Colección de Cartas</h1>
 
           {/* Filtros */}
-          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6 mb-6 border-mystic">
+          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 border-mystic">
             {/* Filtros básicos */}
-            <div className="grid md:grid-cols-3 gap-6 mb-4">
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-4">
               <div>
                 <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                   Buscar por nombre
@@ -210,7 +210,7 @@ export default function CardsPage() {
             {/* Filtros avanzados */}
             {showAdvancedFilters && (
               <div className="mt-4 pt-4 border-t border-[#2D9B96]">
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                       Coste
@@ -247,7 +247,7 @@ export default function CardsPage() {
 
                 {/* Filtros específicos para Aliados */}
                 {typeFilter === 'ALIADO' && (
-                  <div className="grid md:grid-cols-2 gap-6 mt-6">
+                  <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
                     <div>
                       <label className="block text-sm font-semibold text-[#F4C430] mb-2">
                         Fuerza
@@ -306,7 +306,7 @@ export default function CardsPage() {
           </div>
         ) : displayedCards.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
               {displayedCards.map((card) => (
                 <Card key={card.id} card={card} />
               ))}

@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
       imageFile,
       rarity,
       expansion,
+      race,
       isActive
     } = body
 
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
         image_file: imageFile,
         rarity,
         expansion,
+        race: race || null,
         is_active: isActive || false
       })
       .select()

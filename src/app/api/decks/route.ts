@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
 import { requireAuth } from '@/lib/auth'
+import type { DeckCardEntry } from '@/types'
 
 // Cargar variables de entorno
 config({ path: '.env' })
@@ -15,50 +16,66 @@ export async function GET() {
   try {
     const user = await requireAuth()
     
-    // Obtener solo los decks del usuario autenticado
+    // Obtener decks del usuario con JSONB - 1 query simple!
     const { data: decks, error: decksError } = await supabase
       .from('decks')
       .select('*')
-      .eq('userId', user.id)
+      .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
 
     if (decksError) {
       throw decksError
     }
 
-    // Para cada deck, obtener las cartas relacionadas
+    // Expandir las cartas del JSONB con los datos completos
     const decksWithCards = await Promise.all(
       decks.map(async (deck) => {
-        const { data: deckCards, error: cardsError } = await supabase
-          .from('deck_cards')
-          .select(`
-            id,
-            quantity,
-            card:card_id (
-              id,
-              name,
-              type,
-              cost,
-              attack,
-              defense,
-              description,
-              image_url,
-              image_file,
-              rarity,
-              expansion,
-              is_active
-            )
-          `)
-          .eq('deck_id', deck.id)
+        // Extraer los IDs de las cartas del JSONB
+        const cardIds = deck.cards.map((c: DeckCardEntry) => c.card_id)
+        const sideboardIds = deck.sideboard.map((c: DeckCardEntry) => c.card_id)
+        const allCardIds = [...cardIds, ...sideboardIds]
+
+        if (allCardIds.length === 0) {
+          return {
+            ...deck,
+            cards: [],
+            sideboard: []
+          }
+        }
+
+        // Obtener datos completos de todas las cartas en 1 query
+        const { data: cardsData, error: cardsError } = await supabase
+          .from('cards')
+          .select('*')
+          .in('id', allCardIds)
 
         if (cardsError) {
-          console.error('Error fetching deck cards:', cardsError)
-          return { ...deck, deckCards: [] }
+          console.error('Error fetching cards:', cardsError)
+          return {
+            ...deck,
+            cards: [],
+            sideboard: []
+          }
         }
+
+        // Crear un mapa de cartas por ID para búsqueda rápida
+        const cardsMap = new Map(cardsData.map(card => [card.id, card]))
+
+        // Combinar datos del JSONB con los datos completos de las cartas
+        const expandedCards = deck.cards.map((entry: DeckCardEntry) => ({
+          ...entry,
+          card: cardsMap.get(entry.card_id)
+        })).filter((c: any) => c.card) // Filtrar cartas no encontradas
+
+        const expandedSideboard = deck.sideboard.map((entry: DeckCardEntry) => ({
+          ...entry,
+          card: cardsMap.get(entry.card_id)
+        })).filter((c: any) => c.card)
 
         return {
           ...deck,
-          deckCards: deckCards || []
+          cards: expandedCards,
+          sideboard: expandedSideboard
         }
       })
     )
@@ -87,7 +104,7 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth()
     
     const body = await request.json()
-    const { name, description, cards, is_public } = body
+    const { name, description, cards, sideboard, race, is_public } = body
 
     if (!name) {
       return NextResponse.json(
@@ -96,14 +113,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear el deck asociado al usuario autenticado
+    if (!race) {
+      return NextResponse.json(
+        { error: 'La raza del mazo es requerida' },
+        { status: 400 }
+      )
+    }
+
+    // Preparar arrays JSONB de cartas
+    const cardsArray: DeckCardEntry[] = (cards || []).map((card: any) => ({
+      card_id: card.id,
+      quantity: card.quantity || 1
+    }))
+
+    const sideboardArray: DeckCardEntry[] = (sideboard || []).map((card: any) => ({
+      card_id: card.id,
+      quantity: card.quantity || 1
+    }))
+
+    // Crear el deck con JSONB - 1 query simple!
     const { data: deck, error: deckError } = await supabase
       .from('decks')
       .insert({
         name,
         description,
-        userId: user.id,
-        is_public: is_public || false
+        user_id: user.id,
+        race,
+        format: 'Imperio Racial',
+        is_public: is_public || false,
+        cards: cardsArray,
+        sideboard: sideboardArray
       })
       .select()
       .single()
@@ -112,56 +151,50 @@ export async function POST(request: NextRequest) {
       throw deckError
     }
 
-    // Si hay cartas, crear las relaciones
-    if (cards && cards.length > 0) {
-      const deckCardsData = cards.map((card: { id: string; quantity: number }) => ({
-        deck_id: deck.id,
-        card_id: card.id,
-        quantity: card.quantity || 1
-      }))
+    // Obtener datos completos de las cartas para la respuesta
+    const allCardIds = [
+      ...cardsArray.map(c => c.card_id),
+      ...sideboardArray.map(c => c.card_id)
+    ]
 
-      const { error: cardsError } = await supabase
-        .from('deck_cards')
-        .insert(deckCardsData)
+    if (allCardIds.length > 0) {
+      const { data: cardsData, error: cardsError } = await supabase
+        .from('cards')
+        .select('*')
+        .in('id', allCardIds)
 
       if (cardsError) {
-        throw cardsError
+        console.error('Error fetching cards:', cardsError)
+      } else {
+        // Crear mapa de cartas
+        const cardsMap = new Map(cardsData.map(card => [card.id, card]))
+
+        // Expandir con datos completos
+        const expandedCards = deck.cards.map((entry: DeckCardEntry) => ({
+          ...entry,
+          card: cardsMap.get(entry.card_id)
+        })).filter((c: any) => c.card)
+
+        const expandedSideboard = deck.sideboard.map((entry: DeckCardEntry) => ({
+          ...entry,
+          card: cardsMap.get(entry.card_id)
+        })).filter((c: any) => c.card)
+
+        return NextResponse.json({
+          ...deck,
+          cards: expandedCards,
+          sideboard: expandedSideboard
+        }, { status: 201 })
       }
     }
 
-    // Obtener el deck completo con las cartas
-    const { data: deckCards, error: fetchError } = await supabase
-      .from('deck_cards')
-      .select(`
-        id,
-        quantity,
-        card:card_id (
-          id,
-          name,
-          type,
-          cost,
-          attack,
-          defense,
-          description,
-          image_url,
-          image_file,
-          rarity,
-          expansion,
-          is_active
-        )
-      `)
-      .eq('deck_id', deck.id)
-
-    if (fetchError) {
-      throw fetchError
-    }
-
-    const deckWithCards = {
+    // Si no hay cartas o hubo error, devolver deck básico
+    return NextResponse.json({
       ...deck,
-      deckCards: deckCards || []
-    }
+      cards: [],
+      sideboard: []
+    }, { status: 201 })
 
-    return NextResponse.json(deckWithCards, { status: 201 })
   } catch (error: any) {
     console.error('Error creating deck:', error)
     
