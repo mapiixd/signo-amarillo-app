@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { SupabaseCard, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, EXPANSIONS, RACES, EXPANSION_TO_PATH } from '@/types'
+import { SupabaseCard, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, RACES, EXPANSION_TO_PATH } from '@/types'
 import Swal from 'sweetalert2'
 import { getCardFullImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
@@ -40,6 +40,8 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [expansions, setExpansions] = useState<string[]>([])
+  const [expansionsLoading, setExpansionsLoading] = useState(true)
   const [card, setCard] = useState<SupabaseCard | null>(null)
   const [formData, setFormData] = useState<CardFormData>({
     name: '',
@@ -56,8 +58,23 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   })
 
   useEffect(() => {
+    fetchExpansions()
     fetchCard()
   }, [id])
+
+  const fetchExpansions = async () => {
+    try {
+      const response = await fetch('/api/admin/cards/expansions')
+      if (response.ok) {
+        const data = await response.json()
+        setExpansions(data.expansions)
+      }
+    } catch (error) {
+      console.error('Error fetching expansions:', error)
+    } finally {
+      setExpansionsLoading(false)
+    }
+  }
 
   const fetchCard = async () => {
     try {
@@ -442,9 +459,12 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                       onChange={(e) => handleChange('expansion', e.target.value)}
                       className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
                       required
+                      disabled={expansionsLoading}
                     >
-                      <option value="">Selecciona una expansión</option>
-                      {EXPANSIONS.map((expansion) => (
+                      <option value="">
+                        {expansionsLoading ? 'Cargando expansiones...' : 'Selecciona una expansión'}
+                      </option>
+                      {expansions.map((expansion) => (
                         <option key={expansion} value={expansion}>{expansion}</option>
                       ))}
                     </select>

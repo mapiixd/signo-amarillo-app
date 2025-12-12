@@ -21,8 +21,30 @@ const EXPANSION_TO_PATH: Record<string, string> = {
   'Zodiaco': '/cards/zodiaco/'
 }
 
-export function getCardImageUrl(imageFile: string, expansion?: string): string {
+export function getCardImageUrl(imageFile: string | null | undefined, expansion?: string): string | null {
+  // Si imageFile es null, undefined o vacío, retornar null
+  if (!imageFile || imageFile.trim() === '') {
+    return null
+  }
+  
   const cdnUrl = process.env.NEXT_PUBLIC_BUNNY_CDN_URL
+  
+  // Si imageFile ya es una URL completa (empieza con http), retornarla directamente
+  if (imageFile.startsWith('http://') || imageFile.startsWith('https://')) {
+    return imageFile
+  }
+  
+  // Si imageFile ya es una ruta completa local (empieza con /cards/), manejarla
+  if (imageFile.startsWith('/cards/')) {
+    // Si no hay CDN configurado, retornar la ruta local directamente
+    if (!cdnUrl) {
+      return imageFile
+    }
+    // Si hay CDN, convertir a URL del CDN
+    const cleanPath = imageFile.startsWith('/') ? imageFile.slice(1) : imageFile
+    const webpPath = cleanPath.replace(/\.(png|jpg|jpeg)$/i, '.webp')
+    return `${cdnUrl}/${webpPath}`
+  }
   
   // Si se proporciona expansión, construir la ruta completa
   let fullPath = imageFile
@@ -31,6 +53,9 @@ export function getCardImageUrl(imageFile: string, expansion?: string): string {
     if (!imageFile.includes('/cards/')) {
       fullPath = `${EXPANSION_TO_PATH[expansion]}${imageFile}`
     }
+  } else if (!imageFile.includes('/cards/')) {
+    // Si no hay expansión pero tampoco tiene ruta, retornar null
+    return null
   }
   
   // Si no hay CDN configurado, usar ruta local
@@ -52,15 +77,20 @@ export function getCardImageUrl(imageFile: string, expansion?: string): string {
  * Obtener URL de imagen con optimizaciones de Bunny.net
  */
 export function getOptimizedCardImageUrl(
-  imagePath: string, 
+  imagePath: string | null | undefined, 
   options?: {
     width?: number
     height?: number
     quality?: number
     format?: 'webp' | 'png' | 'jpeg'
   }
-): string {
+): string | null {
   const baseUrl = getCardImageUrl(imagePath)
+  
+  // Si no hay URL base, retornar null
+  if (!baseUrl) {
+    return null
+  }
   
   // Si no hay opciones o no es Bunny CDN, devolver URL base
   if (!options || !process.env.NEXT_PUBLIC_BUNNY_CDN_URL) {
@@ -81,7 +111,7 @@ export function getOptimizedCardImageUrl(
 /**
  * Obtener thumbnail de carta (optimizado para listas)
  */
-export function getCardThumbnailUrl(imagePath: string): string {
+export function getCardThumbnailUrl(imagePath: string | null | undefined): string | null {
   return getOptimizedCardImageUrl(imagePath, {
     width: 200,
     quality: 85,
@@ -92,7 +122,7 @@ export function getCardThumbnailUrl(imagePath: string): string {
 /**
  * Obtener imagen de carta de tamaño completo (optimizado para vista detalle)
  */
-export function getCardFullImageUrl(imagePath: string): string {
+export function getCardFullImageUrl(imagePath: string | null | undefined): string | null {
   return getOptimizedCardImageUrl(imagePath, {
     width: 600,
     quality: 90,

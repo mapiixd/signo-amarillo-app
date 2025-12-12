@@ -27,6 +27,20 @@ export default function DecksPage() {
     }
   }
 
+  const handleDelete = async (deckId: string) => {
+    const response = await fetch(`/api/decks/${deckId}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Error al eliminar la baraja')
+    }
+
+    // Refrescar la lista de barajas
+    await fetchDecks()
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col flex-1 bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A]">
@@ -59,7 +73,7 @@ export default function DecksPage() {
           </a>
         </div>
 
-        <DeckList decks={decks} />
+        <DeckList decks={decks} onDelete={handleDelete} />
       </div>
 
       <Footer />

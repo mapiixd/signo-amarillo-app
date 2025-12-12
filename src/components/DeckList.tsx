@@ -2,12 +2,57 @@
 
 import { DeckWithCards } from '@/types'
 import Link from 'next/link'
+import Swal from 'sweetalert2'
 
 interface DeckListProps {
   decks: DeckWithCards[]
+  onDelete?: (deckId: string) => Promise<void>
 }
 
-export function DeckList({ decks }: DeckListProps) {
+export function DeckList({ decks, onDelete }: DeckListProps) {
+  const handleDelete = async (deck: DeckWithCards, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: '¿Estás seguro?',
+      text: `¿Quieres eliminar la baraja "${deck.name}"? Esta acción no se puede deshacer.`,
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      background: '#121825',
+      color: '#E8E8E8'
+    })
+
+    if (result.isConfirmed && onDelete) {
+      try {
+        await onDelete(deck.id)
+        await Swal.fire({
+          icon: 'success',
+          title: '¡Eliminada!',
+          text: 'La baraja ha sido eliminada exitosamente',
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430',
+          timer: 2000,
+          showConfirmButton: false
+        })
+      } catch (error) {
+        console.error('Error deleting deck:', error)
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo eliminar la baraja',
+          confirmButtonColor: '#dc2626',
+          background: '#121825',
+          color: '#E8E8E8'
+        })
+      }
+    }
+  }
   if (decks.length === 0) {
     return (
       <div className="text-center py-16 bg-[#0F1419] border border-[#2D9B96] rounded-xl">
@@ -117,6 +162,15 @@ export function DeckList({ decks }: DeckListProps) {
               >
                 Editar
               </Link>
+              {onDelete && (
+                <button
+                  onClick={(e) => handleDelete(deck, e)}
+                  className="px-4 py-2.5 bg-[#1A2332] border border-red-600/50 text-red-400 text-center rounded-lg hover:bg-red-600/20 hover:border-red-500 hover:text-red-300 transition-colors font-medium text-sm"
+                  title="Eliminar baraja"
+                >
+                  🗑️
+                </button>
+              )}
             </div>
           </div>
         </div>

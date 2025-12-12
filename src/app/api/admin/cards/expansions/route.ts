@@ -13,20 +13,17 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 export async function GET() {
   try {
     const { data: expansions, error } = await supabase
-      .from('cards')
-      .select('expansion')
-      .order('expansion')
+      .from('expansions')
+      .select('name')
+      .order('display_order')
 
     if (error) {
       throw error
     }
 
-    // Obtener expansiones únicas y ordenadas
-    const uniqueExpansions = Array.from(new Set(expansions.map(card => card.expansion)))
-      .filter(expansion => expansion && expansion.trim() !== '')
-      .sort()
+    const expansionNames = expansions.map(exp => exp.name)
 
-    return NextResponse.json({ expansions: uniqueExpansions })
+    return NextResponse.json({ expansions: expansionNames })
   } catch (error) {
     console.error('Error fetching expansions:', error)
     return NextResponse.json(

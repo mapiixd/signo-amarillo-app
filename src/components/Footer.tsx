@@ -25,7 +25,7 @@ export default function Footer() {
 
           {/* Mensaje de la comunidad */}
           <p className="text-[#4ECDC4] text-sm italic max-w-2xl mx-auto">
-            Hecho con la intención de aportar a la comunidad de jugadores del formato Imperio
+            Hecho para ayudar a la comunidad de jugadores del formato Imperio.
           </p>
         </div>
       </div>

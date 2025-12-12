@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CardType, RarityType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, EXPANSIONS, RACES, EXPANSION_TO_PATH, type CardType as CardTypeValue, type RarityType as RarityTypeValue } from '@/types'
+import { CardType, RarityType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, RACES, EXPANSION_TO_PATH, type CardType as CardTypeValue, type RarityType as RarityTypeValue } from '@/types'
 import Swal from 'sweetalert2'
 import Footer from '@/components/Footer'
 
@@ -37,6 +37,8 @@ interface CardFormData {
 export default function NewCardPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [expansions, setExpansions] = useState<string[]>([])
+  const [expansionsLoading, setExpansionsLoading] = useState(true)
   const [formData, setFormData] = useState<CardFormData>({
     name: '',
     type: CardType.ALIADO,
@@ -50,6 +52,24 @@ export default function NewCardPage() {
     race: [],
     isActive: false
   })
+
+  useEffect(() => {
+    fetchExpansions()
+  }, [])
+
+  const fetchExpansions = async () => {
+    try {
+      const response = await fetch('/api/admin/cards/expansions')
+      if (response.ok) {
+        const data = await response.json()
+        setExpansions(data.expansions)
+      }
+    } catch (error) {
+      console.error('Error fetching expansions:', error)
+    } finally {
+      setExpansionsLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -340,9 +360,12 @@ export default function NewCardPage() {
                     onChange={(e) => handleChange('expansion', e.target.value)}
                     className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
                     required
+                    disabled={expansionsLoading}
                   >
-                    <option value="">Selecciona una expansión</option>
-                    {EXPANSIONS.map((expansion) => (
+                    <option value="">
+                      {expansionsLoading ? 'Cargando expansiones...' : 'Selecciona una expansión'}
+                    </option>
+                    {expansions.map((expansion) => (
                       <option key={expansion} value={expansion}>{expansion}</option>
                     ))}
                   </select>

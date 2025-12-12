@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
+import { getRotatedExpansions } from '@/lib/rotation'
 
 // Cargar variables de entorno
 config({ path: '.env' })
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     const attack = searchParams.get('attack')
     const race = searchParams.get('race')
     const ability = searchParams.get('ability')
+    const rotation = searchParams.get('rotation') // 'true' para filtrar por rotación
 
     // Obtener el orden de las expansiones
     const { data: expansions } = await supabase
@@ -31,6 +33,12 @@ export async function GET(request: NextRequest) {
     expansions?.forEach(exp => {
       expansionOrder.set(exp.name, exp.display_order)
     })
+
+    // Si se solicita filtro de rotación, obtener las expansiones en rotación
+    let rotatedExpansions: string[] = []
+    if (rotation === 'true') {
+      rotatedExpansions = await getRotatedExpansions()
+    }
 
     // Obtener TODAS las cartas (sin límite de 1000)
     let allCards: any[] = []
@@ -44,6 +52,11 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('is_active', true)
         .range(from, from + batchSize - 1)
+
+      // Aplicar filtro de rotación si se solicita
+      if (rotation === 'true' && rotatedExpansions.length > 0) {
+        query = query.in('expansion', rotatedExpansions)
+      }
 
       if (search) {
         query = query.ilike('name', `%${search}%`)
@@ -142,13 +155,20 @@ export async function GET(request: NextRequest) {
 
     // Filtrar duplicados por nombre, manteniendo solo la primera versión (primera en el orden)
     const seenNames = new Set<string>()
-    const filteredCards = sortedCards?.filter(card => {
+    let filteredCards = sortedCards?.filter(card => {
       if (seenNames.has(card.name)) {
         return false
       }
       seenNames.add(card.name)
       return true
     })
+
+    // Aplicar filtro de rotación adicional si se solicita (por si acaso alguna carta se filtró antes)
+    if (rotation === 'true' && rotatedExpansions.length > 0) {
+      filteredCards = filteredCards?.filter(card => 
+        rotatedExpansions.includes(card.expansion)
+      )
+    }
 
     return NextResponse.json(filteredCards)
   } catch (error) {

@@ -28,11 +28,29 @@ export default function AdminCardsPage() {
   const [expansionsLoading, setExpansionsLoading] = useState(true)
 
   useEffect(() => {
+    const savedState = sessionStorage.getItem('adminCardsState')
+    if (savedState) {
+      const { expansion, page, limit: savedLimit, search } = JSON.parse(savedState)
+      setSelectedExpansion(expansion || '')
+      setCurrentPage(page || 1)
+      setLimit(savedLimit || 25)
+      setSearchTerm(search || '')
+      sessionStorage.removeItem('adminCardsState')
+    }
     fetchExpansions()
   }, [])
 
   useEffect(() => {
     fetchCards()
+  }, [selectedExpansion, currentPage, limit, searchTerm])
+
+  useEffect(() => {
+    sessionStorage.setItem('adminCardsState', JSON.stringify({
+      expansion: selectedExpansion,
+      page: currentPage,
+      limit,
+      search: searchTerm
+    }))
   }, [selectedExpansion, currentPage, limit, searchTerm])
 
   const fetchExpansions = async () => {
@@ -87,6 +105,7 @@ export default function AdminCardsPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const getStatusBadge = (card: SupabaseCard) => {
@@ -236,7 +255,10 @@ export default function AdminCardsPage() {
                     Coste
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
-                    Fuerza/Defensa
+                    Fuerza
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
+                    Raza
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#F4C430] uppercase tracking-wider">
                     Rareza
@@ -286,9 +308,18 @@ export default function AdminCardsPage() {
                       {card.cost !== null ? card.cost : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[#E8E8E8]">
-                      {card.attack !== null && card.defense !== null ? (
+                      {card.attack !== null ? (
                         <span className="font-medium">
-                          {card.attack}/{card.defense}
+                          {card.attack}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#E8E8E8]">
+                      {card.race ? (
+                        <span className="px-2 py-1 text-xs rounded-full bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4]">
+                          {card.race}
                         </span>
                       ) : (
                         '-'

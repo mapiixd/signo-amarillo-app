@@ -71,7 +71,8 @@ export default function NewDeckPage() {
 
   const fetchCards = async () => {
     try {
-      const response = await fetch('/api/cards')
+      // Obtener solo las cartas en rotación (desde Espiritu Samurai en adelante)
+      const response = await fetch('/api/cards?rotation=true')
       if (response.ok) {
         const data = await response.json()
         setCards(data)
@@ -403,8 +404,18 @@ export default function NewDeckPage() {
     })
     .sort((a, b) => {
       // Ordenar por coste (ascendente)
-      const costA = a.cost ?? 999 // Cartas sin coste al final
-      const costB = b.cost ?? 999
+      // Para ALIADO, ARMA, TALISMAN, TOTEM: null o vacío = 0
+      // Para ORO: null va al final (999)
+      const normalizeCost = (card: CardType): number => {
+        if (card.type === 'ORO') {
+          return card.cost ?? 999 // ORO sin coste va al final
+        }
+        // Para ALIADO, ARMA, TALISMAN, TOTEM: null o vacío = 0
+        return card.cost ?? 0
+      }
+      
+      const costA = normalizeCost(a)
+      const costB = normalizeCost(b)
       
       if (costA !== costB) {
         return costA - costB
@@ -461,8 +472,11 @@ export default function NewDeckPage() {
           <h1 className="text-3xl font-bold text-[#F4C430] mb-2">
             Constructor de Mazos - Raza: {deckRace}
           </h1>
-          <p className="text-[#2D9B96] text-sm">
+          <p className="text-[#2D9B96] text-sm mb-1">
             Formato: Imperio Racial | Solo se mostrarán aliados de raza {deckRace} o sin raza
+          </p>
+          <p className="text-[#F4C430] text-xs italic">
+            📋 Rotación activa: Solo cartas desde "Espiritu Samurai" en adelante están disponibles
           </p>
         </div>
 
