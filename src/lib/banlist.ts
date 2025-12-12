@@ -20,6 +20,7 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
     { cardName: 'Ishikawa Goemon', status: 'banned', maxCopies: 0 },
     { cardName: 'Tenshi X-2', status: 'banned', maxCopies: 0 },
     { cardName: 'Fusil Patriota', status: 'banned', maxCopies: 0 },
+    { cardName: 'Flechero', status: 'banned', maxCopies: 0 },
     { cardName: 'Horda Tenebris', status: 'banned', maxCopies: 0 },
     { cardName: 'Perseguir el Sol', status: 'banned', maxCopies: 0 },
     { cardName: 'Maho no Meiso', status: 'banned', maxCopies: 0 },
@@ -38,7 +39,6 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
     
     // Limitadas a 2 copias
     { cardName: 'Ereshkigal', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Flechero', status: 'limited-2', maxCopies: 2 },
     { cardName: 'Sheut', status: 'limited-2', maxCopies: 2 },
     { cardName: 'Shoki', status: 'limited-2', maxCopies: 2 },
     { cardName: 'Alicia en Wonderland', status: 'limited-2', maxCopies: 2 },
