@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
-import { getRotatedExpansions } from '@/lib/rotation'
+import { filterCardsInRotation } from '@/lib/rotation'
 
 // Cargar variables de entorno
 config({ path: '.env' })
@@ -34,12 +34,6 @@ export async function GET(request: NextRequest) {
       expansionOrder.set(exp.name, exp.display_order)
     })
 
-    // Si se solicita filtro de rotación, obtener las expansiones en rotación
-    let rotatedExpansions: string[] = []
-    if (rotation === 'true') {
-      rotatedExpansions = await getRotatedExpansions()
-    }
-
     // Obtener TODAS las cartas (sin límite de 1000)
     let allCards: any[] = []
     let from = 0
@@ -53,10 +47,8 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true)
         .range(from, from + batchSize - 1)
 
-      // Aplicar filtro de rotación si se solicita
-      if (rotation === 'true' && rotatedExpansions.length > 0) {
-        query = query.in('expansion', rotatedExpansions)
-      }
+      // Nota: No filtramos por expansión aquí cuando rotation=true porque
+      // algunas cartas pueden estar en rotación individual aunque su expansión no lo esté
 
       if (search) {
         query = query.ilike('name', `%${search}%`)
@@ -116,7 +108,9 @@ export async function GET(request: NextRequest) {
 
     const cards = allCards
 
-    // Orden de rareza (de mayor a menor)
+    // Orden de rareza (de mayor a menor rareza)
+    // Números más altos = rareza base (menos rara)
+    // Orden: Promo > Secreta > Legendaria > Ultra Real > Mega Real > Real > Cortesano > Vasallo
     const rarityOrder: Record<string, number> = {
       'PROMO': 1,
       'SECRETA': 2,
@@ -127,8 +121,46 @@ export async function GET(request: NextRequest) {
       'CORTESANO': 7,
       'VASALLO': 8
     }
+    
+    // Rarezas especiales que deben ser filtradas (solo mostrar rareza base)
+    const specialRarities = ['PROMO', 'SECRETA', 'LEGENDARIA']
 
-    // Ordenar las cartas por expansión (INVERSO, del mayor al menor), edid y luego por rareza
+    // Función para extraer edid de image_url o image_file
+    const extractEdid = (card: any): number => {
+      // Prioridad 1: Intentar extraer de image_url
+      if (card.image_url) {
+        // Extraer el nombre del archivo de la URL (puede ser CDN o ruta local)
+        // Ejemplos: /cards/libertadores/003.png, https://cdn.com/cards/libertadores/012.webp
+        const urlMatch = card.image_url.match(/\/(\d+)\.(png|webp|jpg|jpeg)/i)
+        if (urlMatch && urlMatch[1]) {
+          const edid = parseInt(urlMatch[1], 10)
+          if (!isNaN(edid)) {
+            return edid
+          }
+        }
+      }
+      
+      // Prioridad 2: Intentar extraer de image_file como fallback
+      if (card.image_file) {
+        const fileMatch = card.image_file.match(/(\d+)\.(png|webp|jpg|jpeg)/i)
+        if (fileMatch && fileMatch[1]) {
+          const edid = parseInt(fileMatch[1], 10)
+          if (!isNaN(edid)) {
+            return edid
+          }
+        }
+        // Fallback: intentar parsear directamente (formato antiguo)
+        const edid = parseInt(card.image_file.replace(/\.(png|webp|jpg|jpeg)/i, ''), 10)
+        if (!isNaN(edid)) {
+          return edid
+        }
+      }
+      
+      // Si no se puede extraer, retornar un valor alto para que vaya al final
+      return 999999
+    }
+
+    // Ordenar las cartas por expansión, rareza (en orden específico) y luego por edid
     const sortedCards = cards?.sort((a, b) => {
       const orderA = expansionOrder.get(a.expansion) ?? 999
       const orderB = expansionOrder.get(b.expansion) ?? 999
@@ -138,36 +170,131 @@ export async function GET(request: NextRequest) {
         return orderB - orderA  // Invertido
       }
       
-      // Si están en la misma expansión, ordenar por image_file (edid)
-      const edidA = parseInt(a.image_file?.replace('.png', '') || '999999')
-      const edidB = parseInt(b.image_file?.replace('.png', '') || '999999')
-      
-      if (edidA !== edidB) {
-        return edidA - edidB
-      }
-      
-      // Si tienen el mismo edid, ordenar por rareza
+      // Si están en la misma expansión, ordenar por rareza primero (Promo > Secreta > Legendaria > Ultra Real > Mega Real > Real > Cortesano > Vasallo)
       const rarityA = rarityOrder[a.rarity] ?? 999
       const rarityB = rarityOrder[b.rarity] ?? 999
       
-      return rarityA - rarityB
-    })
-
-    // Filtrar duplicados por nombre, manteniendo solo la primera versión (primera en el orden)
-    const seenNames = new Set<string>()
-    let filteredCards = sortedCards?.filter(card => {
-      if (seenNames.has(card.name)) {
-        return false
+      if (rarityA !== rarityB) {
+        return rarityA - rarityB  // Menor número = mayor rareza, aparece primero
       }
-      seenNames.add(card.name)
-      return true
+      
+      // Si tienen la misma rareza y están en Libertadores, priorizar las que tienen "25_aniversario" en image_url
+      // Excluir el "caleuche" de esta excepción
+      if (a.expansion === 'Libertadores' && b.expansion === 'Libertadores') {
+        const nameA = (a.name?.toLowerCase() ?? '').trim()
+        const nameB = (b.name?.toLowerCase() ?? '').trim()
+        const isCaleucheA = nameA.includes('caleuche')
+        const isCaleucheB = nameB.includes('caleuche')
+        
+        const hasAniversarioA = a.image_url?.includes('25_aniversario') && !isCaleucheA ? 0 : 1
+        const hasAniversarioB = b.image_url?.includes('25_aniversario') && !isCaleucheB ? 0 : 1
+        
+        if (hasAniversarioA !== hasAniversarioB) {
+          return hasAniversarioA - hasAniversarioB  // Las que tienen 25_aniversario van primero (0 < 1)
+        }
+      }
+      
+      // Si tienen la misma rareza, ordenar por edid extraído de image_url o image_file
+      const edidA = extractEdid(a)
+      const edidB = extractEdid(b)
+      
+      return edidA - edidB
     })
 
-    // Aplicar filtro de rotación adicional si se solicita (por si acaso alguna carta se filtró antes)
-    if (rotation === 'true' && rotatedExpansions.length > 0) {
-      filteredCards = filteredCards?.filter(card => 
-        rotatedExpansions.includes(card.expansion)
-      )
+    // Filtrar duplicados
+    // En el editor de mazos (rotation=true): agrupar solo por nombre para evitar múltiples versiones
+    // En el visor de cartas: agrupar por nombre+expansión para mostrar todas las versiones
+    const cardsByKey = new Map<string, any>()
+    
+    // Determinar la clave de agrupación según el contexto
+    const groupByExpansion = rotation !== 'true' // En el visor de cartas, agrupar por nombre+expansión
+    
+    sortedCards?.forEach(card => {
+      // Normalizar el nombre para la comparación (case-insensitive, sin espacios extra)
+      const normalizedName = card.name.trim().toLowerCase()
+      const key = groupByExpansion 
+        ? `${normalizedName}|${card.expansion}` 
+        : normalizedName // Solo por nombre en el editor de mazos
+      
+      const currentRarityOrder = rarityOrder[card.rarity] ?? 999
+      
+      if (!cardsByKey.has(key)) {
+        // Primera vez que vemos esta carta
+        cardsByKey.set(key, card)
+      } else {
+        // Ya existe una versión de esta carta
+        const existingCard = cardsByKey.get(key)!
+        const existingRarityOrder = rarityOrder[existingCard.rarity] ?? 999
+        
+        // Mantener la carta con mayor rarezaOrder (menor rareza = rareza base)
+        // Si la nueva carta tiene mayor rarezaOrder, reemplazar
+        if (currentRarityOrder > existingRarityOrder) {
+          cardsByKey.set(key, card)
+        }
+        // Si tienen el mismo rarezaOrder pero la existente es una rareza especial, reemplazar
+        else if (currentRarityOrder === existingRarityOrder) {
+          const existingIsSpecial = specialRarities.includes(existingCard.rarity)
+          const currentIsSpecial = specialRarities.includes(card.rarity)
+          
+          // Si la existente es especial y la nueva no, reemplazar
+          if (existingIsSpecial && !currentIsSpecial) {
+            cardsByKey.set(key, card)
+          }
+          // Si ambas son especiales o ambas no, mantener la existente (ya está ordenada)
+        }
+      }
+    })
+    
+    // Convertir el Map a array
+    let filteredCards = Array.from(cardsByKey.values())
+
+    // Reordenar las cartas filtradas para mantener el orden correcto
+    filteredCards = filteredCards.sort((a, b) => {
+      const orderA = expansionOrder.get(a.expansion) ?? 999
+      const orderB = expansionOrder.get(b.expansion) ?? 999
+      
+      // Ordenar expansiones en orden INVERSO (mayor a menor)
+      if (orderA !== orderB) {
+        return orderB - orderA  // Invertido
+      }
+      
+      // Si están en la misma expansión, ordenar por rareza primero (Promo > Secreta > Legendaria > Ultra Real > Mega Real > Real > Cortesano > Vasallo)
+      const rarityA = rarityOrder[a.rarity] ?? 999
+      const rarityB = rarityOrder[b.rarity] ?? 999
+      
+      if (rarityA !== rarityB) {
+        return rarityA - rarityB  // Menor número = mayor rareza, aparece primero
+      }
+      
+      // Si tienen la misma rareza y están en Libertadores, priorizar las que tienen "25_aniversario" en image_url
+      // Excluir el "caleuche" de esta excepción
+      if (a.expansion === 'Libertadores' && b.expansion === 'Libertadores') {
+        const nameA = (a.name?.toLowerCase() ?? '').trim()
+        const nameB = (b.name?.toLowerCase() ?? '').trim()
+        const isCaleucheA = nameA.includes('caleuche')
+        const isCaleucheB = nameB.includes('caleuche')
+        
+        const hasAniversarioA = a.image_url?.includes('25_aniversario') && !isCaleucheA ? 0 : 1
+        const hasAniversarioB = b.image_url?.includes('25_aniversario') && !isCaleucheB ? 0 : 1
+        
+        if (hasAniversarioA !== hasAniversarioB) {
+          return hasAniversarioA - hasAniversarioB  // Las que tienen 25_aniversario van primero (0 < 1)
+        }
+      }
+      
+      // Si tienen la misma rareza, ordenar por edid extraído de image_url o image_file
+      const edidA = extractEdid(a)
+      const edidB = extractEdid(b)
+      
+      return edidA - edidB
+    })
+
+    // Aplicar filtro de rotación si se solicita
+    // Esto incluye tanto cartas por expansión como cartas individuales en rotación
+    if (rotation === 'true') {
+      // Obtener el formato del query string si está disponible, por defecto 'Imperio Racial'
+      const format = searchParams.get('format') || 'Imperio Racial'
+      filteredCards = await filterCardsInRotation(filteredCards || [], format)
     }
 
     return NextResponse.json(filteredCards)

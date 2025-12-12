@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Card as CardType } from '@/types'
+import { Card as CardType, CARD_TYPE_LABELS } from '@/types'
 import { Card } from '@/components/Card'
 import Footer from '@/components/Footer'
 
@@ -15,6 +15,7 @@ export default function CardsPage() {
   const [allCards, setAllCards] = useState<CardType[]>([])
   const [displayedCards, setDisplayedCards] = useState<CardType[]>([])
   const [expansions, setExpansions] = useState<Expansion[]>([])
+  const [allUniqueTypes, setAllUniqueTypes] = useState<string[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -46,7 +47,16 @@ export default function CardsPage() {
 
   useEffect(() => {
     fetchExpansions()
+    fetchAllTypes()
   }, [])
+
+  // Limpiar filtros avanzados cuando cambia el tipo
+  useEffect(() => {
+    setCostFilter('')
+    setAttackFilter('')
+    setRaceFilter('')
+    setAbilityText('')
+  }, [typeFilter])
 
   useEffect(() => {
     fetchCards()
@@ -99,6 +109,20 @@ export default function CardsPage() {
     }
   }
 
+  const fetchAllTypes = async () => {
+    try {
+      // Obtener todas las cartas sin filtros para extraer los tipos únicos
+      const response = await fetch('/api/cards')
+      if (response.ok) {
+        const data = await response.json()
+        const uniqueTypes = Array.from(new Set(data.map((card: CardType) => card.type)))
+        setAllUniqueTypes(uniqueTypes)
+      }
+    } catch (error) {
+      console.error('Error fetching all types:', error)
+    }
+  }
+
   const fetchCards = async () => {
     setLoading(true)
     setPage(1) // Reiniciar a la primera página cuando cambian los filtros
@@ -127,7 +151,11 @@ export default function CardsPage() {
   }
 
   const hasMore = displayedCards.length < allCards.length
-  const uniqueTypes = Array.from(new Set(allCards.map(card => card.type)))
+  
+  // Función para formatear el nombre del tipo
+  const formatTypeName = (type: string): string => {
+    return CARD_TYPE_LABELS[type as keyof typeof CARD_TYPE_LABELS] || type
+  }
 
   // Solo mostrar pantalla de carga completa en la carga inicial
   if (initialLoading) {
@@ -174,8 +202,8 @@ export default function CardsPage() {
                   className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
                 >
                   <option value="">Todos los tipos</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                  {allUniqueTypes.map(type => (
+                    <option key={type} value={type}>{formatTypeName(type)}</option>
                   ))}
                 </select>
               </div>

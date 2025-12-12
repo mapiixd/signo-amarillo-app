@@ -15,13 +15,9 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
   'Imperio Racial': [
     // Prohibidas (0 copias)
     { cardName: 'Niten Ichi-Ryu', status: 'banned', maxCopies: 0 },
-    { cardName: 'Rey Sigfried', status: 'banned', maxCopies: 0 },
     { cardName: 'Senso-ji', status: 'banned', maxCopies: 0 },
     { cardName: 'Hitodama', status: 'banned', maxCopies: 0 },
     { cardName: 'Ishikawa Goemon', status: 'banned', maxCopies: 0 },
-    { cardName: 'Lugus', status: 'banned', maxCopies: 0 },
-    { cardName: 'Galvarino', status: 'banned', maxCopies: 0 },
-    { cardName: 'Ramsés II', status: 'banned', maxCopies: 0 },
     { cardName: 'Tenshi X-2', status: 'banned', maxCopies: 0 },
     { cardName: 'Fusil Patriota', status: 'banned', maxCopies: 0 },
     { cardName: 'Horda Tenebris', status: 'banned', maxCopies: 0 },
@@ -47,7 +43,7 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
     { cardName: 'Shoki', status: 'limited-2', maxCopies: 2 },
     { cardName: 'Alicia en Wonderland', status: 'limited-2', maxCopies: 2 },
     { cardName: 'Rey de Amarillo', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Anillo del Vacío', status: 'limited-2', maxCopies: 2 },
+    { cardName: 'Anillo de Vacío', status: 'limited-2', maxCopies: 2 },
   ],
   
   'VCR': [
@@ -56,23 +52,17 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
     { cardName: 'Septimus', status: 'banned', maxCopies: 0 },
     { cardName: 'Maho no Meiso', status: 'banned', maxCopies: 0 },
     { cardName: 'Kogarasumaru', status: 'banned', maxCopies: 0 },
-    { cardName: 'Pathothep', status: 'banned', maxCopies: 0 },
     
     // Limitadas a 1 copia
-    { cardName: 'Vodyanoy', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Moo', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Paris', status: 'limited-1', maxCopies: 1 },
+    { cardName: 'París', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Onsen', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Oda Nobunaga', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Azi Sruvara', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Piramide Roja', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Pirata Wakou', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Jaculus', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Morrigan la cazadora', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Escorpion de Seth', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Svipdgar', status: 'limited-1', maxCopies: 1 },
+    { cardName: 'Pirata Wokou', status: 'limited-1', maxCopies: 1 },
+    { cardName: 'Escorpión de Seth', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Monitor Araucano', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Eric Bloodaxe', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Ayyappan', status: 'limited-1', maxCopies: 1 },
   ],
   

@@ -53,3 +53,4 @@ npm run reset-import-all
 - El script procesa la primera hoja de cada archivo Excel
 - Si una carta con el mismo nombre y expansión ya existe, se actualizará en lugar de crear una duplicada
 
+

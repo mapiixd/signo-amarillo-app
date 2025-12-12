@@ -1,41 +1,151 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { DeckWithCards, Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
 import html2canvas from 'html2canvas'
+import Swal from 'sweetalert2'
+
+interface DeckWithLikes extends DeckWithCards {
+  likes_count?: number
+  is_liked?: boolean
+  user?: {
+    id: string
+    username: string
+  }
+}
 
 export default function DeckViewPage() {
   const params = useParams()
   const router = useRouter()
-  const [deck, setDeck] = useState<DeckWithCards | null>(null)
+  const searchParams = useSearchParams()
+  const [deck, setDeck] = useState<DeckWithLikes | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
   const [exporting, setExporting] = useState(false)
+  const [isLiked, setIsLiked] = useState(false)
+  const [likesCount, setLikesCount] = useState(0)
   const deckViewRef = useRef<HTMLDivElement>(null)
+  
+  const fromCommunity = searchParams.get('from') === 'community'
 
   useEffect(() => {
     if (params.id) {
       fetchDeck(params.id as string)
     }
-  }, [params.id])
+  }, [params.id, fromCommunity])
+
+  useEffect(() => {
+    if (deck && fromCommunity && deck.is_public) {
+      checkLikeStatus()
+    }
+  }, [deck, fromCommunity])
 
   const fetchDeck = async (id: string) => {
     try {
-      const response = await fetch('/api/decks')
-      if (response.ok) {
-        const decks = await response.json()
-        const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
-        if (foundDeck) {
-          setDeck(foundDeck)
+      if (fromCommunity) {
+        // Si viene de la comunidad, buscar en los mazos públicos
+        const response = await fetch('/api/decks/community?limit=1000')
+        if (response.ok) {
+          const data = await response.json()
+          const foundDeck = data.decks.find((d: DeckWithLikes) => d.id === id)
+          if (foundDeck) {
+            setDeck(foundDeck)
+            setLikesCount(foundDeck.likes_count || 0)
+            return
+          }
+        }
+        // Si no se encuentra en la comunidad, intentar desde los mazos del usuario (por si es el dueño)
+        const userResponse = await fetch('/api/decks')
+        if (userResponse.ok) {
+          const decks = await userResponse.json()
+          const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
+          if (foundDeck) {
+            setDeck(foundDeck)
+            return
+          }
+        }
+      } else {
+        // Si no viene de la comunidad, buscar en los mazos del usuario
+        const response = await fetch('/api/decks')
+        if (response.ok) {
+          const decks = await response.json()
+          const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
+          if (foundDeck) {
+            setDeck(foundDeck)
+            return
+          }
+        }
+        // Si no se encuentra en los mazos del usuario, intentar desde la comunidad (por si es público)
+        const communityResponse = await fetch('/api/decks/community?limit=1000')
+        if (communityResponse.ok) {
+          const data = await communityResponse.json()
+          const foundDeck = data.decks.find((d: DeckWithLikes) => d.id === id)
+          if (foundDeck) {
+            setDeck(foundDeck)
+            setLikesCount(foundDeck.likes_count || 0)
+            return
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching deck:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkLikeStatus = async () => {
+    if (!deck) return
+    try {
+      const response = await fetch(`/api/decks/${deck.id}/like`)
+      if (response.ok) {
+        const data = await response.json()
+        setIsLiked(data.liked)
+      }
+    } catch (error) {
+      console.error('Error checking like status:', error)
+    }
+  }
+
+  const handleLike = async () => {
+    if (!deck) return
+    
+    try {
+      const response = await fetch(`/api/decks/${deck.id}/like`, {
+        method: 'POST'
+      })
+
+      if (response.status === 401) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Inicia sesión',
+          text: 'Debes iniciar sesión para dar like a los mazos',
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430'
+        })
+        return
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        const newLikedState = data.liked
+        setIsLiked(newLikedState)
+        setLikesCount(prev => newLikedState ? prev + 1 : prev - 1)
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo dar like al mazo',
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
     }
   }
 
@@ -56,10 +166,10 @@ export default function DeckViewPage() {
         <div className="text-center">
           <p className="text-[#A0A0A0] text-lg mb-4">Baraja no encontrada</p>
           <button
-            onClick={() => router.push('/decks')}
+            onClick={() => router.push(fromCommunity ? '/decks/community' : '/decks')}
             className="px-6 py-3 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-colors"
           >
-            Volver a Mis Barajas
+            {fromCommunity ? 'Volver a Mazos de la Comunidad' : 'Volver a Mis Barajas'}
           </button>
         </div>
       </div>
@@ -323,7 +433,7 @@ export default function DeckViewPage() {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => router.back()}
+            onClick={() => fromCommunity ? router.push('/decks/community') : router.back()}
             className="text-[#2D9B96] hover:text-[#4ECDC4] mb-4 flex items-center gap-2 transition-colors"
           >
             ← Volver
@@ -369,6 +479,11 @@ export default function DeckViewPage() {
                     {deck.is_public && (
                       <span className="text-[#4ECDC4]">🌐 Pública</span>
                     )}
+                    {fromCommunity && (deck as DeckWithLikes).user && (
+                      <span className="text-[#4ECDC4]">
+                        por <span className="text-[#F4C430] font-semibold">{(deck as DeckWithLikes).user?.username}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -380,12 +495,39 @@ export default function DeckViewPage() {
                   >
                     {exporting ? '📸 Exportando...' : '📸 Exportar Imagen'}
                   </button>
-                  <button
-                    onClick={() => router.push(`/decks/${deck.id}/edit`)}
-                    className="px-5 py-2.5 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-colors font-medium shadow-lg"
-                  >
-                    Editar Baraja
-                  </button>
+                  {fromCommunity && deck.is_public && (
+                    <button
+                      onClick={handleLike}
+                      className={`px-5 py-2.5 rounded-lg transition-colors font-medium shadow-lg flex items-center gap-2 ${
+                        isLiked
+                          ? 'bg-red-600/20 border border-red-600/50 text-red-400 hover:bg-red-600/30'
+                          : 'bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] hover:bg-[#2D9B96] hover:text-white'
+                      }`}
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill={isLiked ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                      <span>{likesCount}</span>
+                    </button>
+                  )}
+                  {!fromCommunity && (
+                    <button
+                      onClick={() => router.push(`/decks/${deck.id}/edit`)}
+                      className="px-5 py-2.5 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-colors font-medium shadow-lg"
+                    >
+                      Editar Baraja
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -455,6 +597,9 @@ export default function DeckViewPage() {
                 month: 'long', 
                 day: 'numeric' 
               })}</span>
+              {fromCommunity && (deck as DeckWithLikes).user && (
+                <span><span className="text-[#4ECDC4]">Creado por:</span> <span className="text-[#F4C430] font-semibold">{(deck as DeckWithLikes).user?.username}</span></span>
+              )}
             </div>
           </div>
 

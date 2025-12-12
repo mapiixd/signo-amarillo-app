@@ -15,6 +15,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const expansion = searchParams.get('expansion')
     const search = searchParams.get('search')
+    const type = searchParams.get('type')
+    const race = searchParams.get('race')
+    const rarity = searchParams.get('rarity')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '25')
 
@@ -30,6 +33,15 @@ export async function GET(request: NextRequest) {
     }
     if (search) {
       countQuery = countQuery.ilike('name', `%${search}%`)
+    }
+    if (type) {
+      countQuery = countQuery.eq('type', type)
+    }
+    if (race) {
+      countQuery = countQuery.eq('race', race)
+    }
+    if (rarity) {
+      countQuery = countQuery.eq('rarity', rarity)
     }
 
     const { count: totalCount, error: countError } = await countQuery
@@ -51,6 +63,15 @@ export async function GET(request: NextRequest) {
     }
     if (search) {
       dataQuery = dataQuery.ilike('name', `%${search}%`)
+    }
+    if (type) {
+      dataQuery = dataQuery.eq('type', type)
+    }
+    if (race) {
+      dataQuery = dataQuery.eq('race', race)
+    }
+    if (rarity) {
+      dataQuery = dataQuery.eq('rarity', rarity)
     }
 
     const { data: cards, error: dataError } = await dataQuery

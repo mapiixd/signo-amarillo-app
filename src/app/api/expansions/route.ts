@@ -15,7 +15,7 @@ export async function GET() {
     const { data: expansions, error } = await supabase
       .from('expansions')
       .select('*')
-      .order('display_order', { ascending: true })
+      .order('display_order', { ascending: false })
 
     if (error) {
       throw error

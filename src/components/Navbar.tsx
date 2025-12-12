@@ -89,7 +89,7 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-[#0A0E1A] border-b border-[#2D9B96] shadow-lg">
+    <nav className="bg-[#0A0E1A] border-b border-[#2D9B96] shadow-lg relative z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo/Home - El Signo Amarillo */}
@@ -136,18 +136,40 @@ export default function Navbar() {
                   : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
               }`}
             >
-              Cartas
+              Grimorio de Cartas
             </Link>
 
             <Link
               href="/decks"
               className={`px-4 py-2 rounded-lg transition-all font-medium ${
-                isActive('/decks')
+                isActive('/decks') && !isActive('/decks/community')
                   ? 'bg-[#2D9B96] text-white shadow-lg signo-glow-cyan'
                   : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
               }`}
             >
-              Mazos
+              Forja de Mazos
+            </Link>
+
+            <Link
+              href="/decks/community"
+              className={`px-4 py-2 rounded-lg transition-all font-medium ${
+                isActive('/decks/community')
+                  ? 'bg-[#2D9B96] text-white shadow-lg signo-glow-cyan'
+                  : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
+              }`}
+            >
+              Mazos de la Comunidad
+            </Link>
+
+            <Link
+              href="/banlist"
+              className={`px-4 py-2 rounded-lg transition-all font-medium ${
+                isActive('/banlist')
+                  ? 'bg-[#2D9B96] text-white shadow-lg signo-glow-cyan'
+                  : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
+              }`}
+            >
+              Banlist
             </Link>
 
             {/* Admin Link - Solo para administradores */}
@@ -188,7 +210,7 @@ export default function Navbar() {
                       </div>
                       <button
                         onClick={handleLogout}
-                        className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all font-medium"
+                        className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all font-medium cursor-pointer"
                       >
                         Salir
                       </button>
@@ -228,19 +250,43 @@ export default function Navbar() {
                     : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
                 }`}
               >
-                Cartas
+                Grimorio de Cartas
               </Link>
 
               <Link
                 href="/decks"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`px-4 py-3 rounded-lg transition-all font-medium ${
-                  isActive('/decks')
+                  isActive('/decks') && !isActive('/decks/community')
                     ? 'bg-[#2D9B96] text-white shadow-lg'
                     : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
                 }`}
               >
-                Mazos
+                Forja de Mazos
+              </Link>
+
+              <Link
+                href="/decks/community"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`px-4 py-3 rounded-lg transition-all font-medium ${
+                  isActive('/decks/community')
+                    ? 'bg-[#2D9B96] text-white shadow-lg'
+                    : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
+                }`}
+              >
+                Mazos de la Comunidad
+              </Link>
+
+              <Link
+                href="/banlist"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`px-4 py-3 rounded-lg transition-all font-medium ${
+                  isActive('/banlist')
+                    ? 'bg-[#2D9B96] text-white shadow-lg'
+                    : 'text-[#4ECDC4] hover:bg-[#1A2332] hover:text-[#F4C430]'
+                }`}
+              >
+                Banlist
               </Link>
 
               {user?.role === 'ADMIN' && (
@@ -280,7 +326,7 @@ export default function Navbar() {
                           setIsMobileMenuOpen(false)
                           handleLogout()
                         }}
-                        className="w-full px-4 py-3 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all font-medium"
+                        className="w-full px-4 py-3 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all font-medium cursor-pointer"
                       >
                         Salir
                       </button>

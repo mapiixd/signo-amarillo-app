@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Swal from 'sweetalert2'
-import { Card as CardType, CARD_TYPE_LABELS } from '@/types'
+import { Card as CardType, CARD_TYPE_LABELS, DeckWithCards } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
 import { getCardBanStatus, isCardBanned, getMaxCopies, getBanStatusIcon, getBanStatusLabel, type FormatType } from '@/lib/banlist'
 import Footer from '@/components/Footer'
@@ -19,12 +19,12 @@ interface Expansion {
   display_order: number
 }
 
-export default function NewDeckPage() {
+export default function EditDeckPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const raceParam = searchParams.get('race')
+  const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null)
   
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cards, setCards] = useState<CardType[]>([])
@@ -34,8 +34,9 @@ export default function NewDeckPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('Todas')
   const [expansionFilter, setExpansionFilter] = useState<string>('Todas')
-  const [deckRace, setDeckRace] = useState<string>(raceParam || '')
+  const [deckRace, setDeckRace] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [loadingDeck, setLoadingDeck] = useState(true)
   const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
   const [selectedCardForView, setSelectedCardForView] = useState<CardType | null>(null)
   
@@ -45,17 +46,18 @@ export default function NewDeckPage() {
   const prevMainDeckLengthRef = useRef<number>(0)
   const prevSideboardLengthRef = useRef<number>(0)
 
-  // Redirigir si no hay raza seleccionada
+  // Resolver params
   useEffect(() => {
-    if (!raceParam) {
-      router.push('/decks/format-select')
-    }
-  }, [raceParam, router])
+    params.then(setResolvedParams)
+  }, [params])
 
   useEffect(() => {
-    fetchCards()
-    fetchExpansions()
-  }, [])
+    if (resolvedParams?.id) {
+      fetchDeck(resolvedParams.id)
+      fetchCards()
+      fetchExpansions()
+    }
+  }, [resolvedParams])
 
   // Auto-scroll solo cuando se agrega una nueva carta al mazo principal (no cuando se modifica cantidad)
   useEffect(() => {
@@ -73,6 +75,60 @@ export default function NewDeckPage() {
     prevSideboardLengthRef.current = sideboard.length
   }, [sideboard.length, activeTab])
 
+  const fetchDeck = async (id: string) => {
+    try {
+      const response = await fetch('/api/decks')
+      if (response.ok) {
+        const decks = await response.json()
+        const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
+        if (foundDeck) {
+          setName(foundDeck.name)
+          setDescription(foundDeck.description || '')
+          setIsPublic(foundDeck.is_public)
+          setDeckRace(foundDeck.race || '')
+          
+          // Cargar cartas del mazo principal
+          const mainCards: SelectedCard[] = foundDeck.cards.map((entry: any) => ({
+            card: entry.card,
+            quantity: entry.quantity
+          }))
+          setSelectedCards(mainCards)
+          
+          // Cargar cartas del sideboard
+          const sideCards: SelectedCard[] = foundDeck.sideboard.map((entry: any) => ({
+            card: entry.card,
+            quantity: entry.quantity
+          }))
+          setSideboard(sideCards)
+        } else {
+          await Swal.fire({
+            icon: 'error',
+            title: 'Baraja no encontrada',
+            text: 'No se pudo encontrar la baraja solicitada',
+            confirmButtonColor: '#2D9B96',
+            background: '#121825',
+            color: '#F4C430'
+          })
+          router.push('/decks')
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching deck:', error)
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error al cargar la baraja',
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      router.push('/decks')
+    } finally {
+      setLoadingDeck(false)
+      setLoading(false)
+    }
+  }
+
   const fetchCards = async () => {
     try {
       // Obtener solo las cartas en rotación (desde Espiritu Samurai en adelante)
@@ -83,8 +139,6 @@ export default function NewDeckPage() {
       }
     } catch (error) {
       console.error('Error fetching cards:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -300,13 +354,14 @@ export default function NewDeckPage() {
     setSaving(true)
 
     try {
-      const response = await fetch('/api/decks', {
-        method: 'POST',
+      const response = await fetch(`/api/decks/${resolvedParams?.id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name,
+          description,
           race: deckRace,
           is_public: isPublic,
           cards: selectedCards.map(sc => ({
@@ -324,31 +379,31 @@ export default function NewDeckPage() {
         await Swal.fire({
           icon: 'success',
           title: '¡Éxito!',
-          text: 'Baraja creada exitosamente',
+          text: 'Baraja actualizada exitosamente',
           confirmButtonColor: '#2D9B96',
           background: '#121825',
           color: '#F4C430',
           timer: 2000,
           showConfirmButton: false
         })
-        router.push('/decks')
+        router.push(`/decks/${resolvedParams?.id}`)
       } else {
         const error = await response.json()
         await Swal.fire({
           icon: 'error',
           title: 'Error',
-          text: error.error || 'No se pudo crear la baraja',
+          text: error.error || 'No se pudo actualizar la baraja',
           confirmButtonColor: '#2D9B96',
           background: '#121825',
           color: '#F4C430'
         })
       }
     } catch (error) {
-      console.error('Error creating deck:', error)
+      console.error('Error updating deck:', error)
       await Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Error al crear la baraja',
+        text: 'Error al actualizar la baraja',
         confirmButtonColor: '#2D9B96',
         background: '#121825',
         color: '#F4C430'
@@ -467,12 +522,12 @@ export default function NewDeckPage() {
     ? (cardsWithCost.reduce((sum, sc) => sum + (sc.card.cost || 0) * sc.quantity, 0) / totalCardsWithCost).toFixed(2)
     : '0.00'
 
-  if (loading) {
+  if (loading || loadingDeck) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2D9B96] mx-auto mb-4"></div>
-          <p className="text-[#F4C430]">Cargando cartas...</p>
+          <p className="text-[#F4C430]">Cargando baraja...</p>
         </div>
       </div>
     )
@@ -490,7 +545,7 @@ export default function NewDeckPage() {
             ← Volver
           </button>
           <h1 className="text-3xl font-bold text-[#F4C430] mb-2">
-            Constructor de Mazos - Raza: {deckRace}
+            Editar Baraja - Raza: {deckRace}
           </h1>
           <p className="text-[#2D9B96] text-sm mb-1">
             Formato: Imperio Racial | Solo se mostrarán aliados de raza {deckRace} o sin raza
@@ -885,7 +940,7 @@ export default function NewDeckPage() {
                   className="w-full px-6 py-3 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   title={totalCards !== 50 ? 'El mazo principal debe tener exactamente 50 cartas' : ''}
                 >
-                  {saving ? 'Guardando...' : 'Guardar Mazo'}
+                  {saving ? 'Guardando...' : 'Actualizar Mazo'}
                 </button>
                 <button
                   type="button"

@@ -8,7 +8,7 @@ export default function Home() {
         {/* Hero Section */}
         <div className="text-center mb-10 sm:mb-12 md:mb-16 relative">
           {/* Logo de fondo */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-5">
+          <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
             <img 
               src="/logo-icon.png" 
               alt="" 

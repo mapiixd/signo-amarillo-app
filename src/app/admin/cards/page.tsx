@@ -24,34 +24,45 @@ export default function AdminCardsPage() {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [limit, setLimit] = useState(25) // Cartas por página
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedType, setSelectedType] = useState<string>('')
+  const [selectedRace, setSelectedRace] = useState<string>('')
+  const [selectedRarity, setSelectedRarity] = useState<string>('')
   const [allExpansions, setAllExpansions] = useState<string[]>([])
+  const [allRaces, setAllRaces] = useState<string[]>([])
   const [expansionsLoading, setExpansionsLoading] = useState(true)
 
   useEffect(() => {
     const savedState = sessionStorage.getItem('adminCardsState')
     if (savedState) {
-      const { expansion, page, limit: savedLimit, search } = JSON.parse(savedState)
+      const { expansion, page, limit: savedLimit, search, type, race, rarity } = JSON.parse(savedState)
       setSelectedExpansion(expansion || '')
       setCurrentPage(page || 1)
       setLimit(savedLimit || 25)
       setSearchTerm(search || '')
+      setSelectedType(type || '')
+      setSelectedRace(race || '')
+      setSelectedRarity(rarity || '')
       sessionStorage.removeItem('adminCardsState')
     }
     fetchExpansions()
+    fetchRaces()
   }, [])
 
   useEffect(() => {
     fetchCards()
-  }, [selectedExpansion, currentPage, limit, searchTerm])
+  }, [selectedExpansion, currentPage, limit, searchTerm, selectedType, selectedRace, selectedRarity])
 
   useEffect(() => {
     sessionStorage.setItem('adminCardsState', JSON.stringify({
       expansion: selectedExpansion,
       page: currentPage,
       limit,
-      search: searchTerm
+      search: searchTerm,
+      type: selectedType,
+      race: selectedRace,
+      rarity: selectedRarity
     }))
-  }, [selectedExpansion, currentPage, limit, searchTerm])
+  }, [selectedExpansion, currentPage, limit, searchTerm, selectedType, selectedRace, selectedRarity])
 
   const fetchExpansions = async () => {
     try {
@@ -67,6 +78,45 @@ export default function AdminCardsPage() {
     }
   }
 
+  const fetchRaces = async () => {
+    try {
+      // Obtener todas las razas únicas de las cartas usando una consulta específica
+      // Primero intentamos obtener todas las cartas con paginación grande para obtener razas
+      const response = await fetch('/api/admin/cards?limit=1000')
+      if (response.ok) {
+        const data = await response.json()
+        const uniqueRaces = Array.from(new Set(
+          data.cards
+            .map((card: SupabaseCard) => card.race)
+            .filter((race: string | null) => race && race.trim() !== '')
+        )).sort() as string[]
+        setAllRaces(uniqueRaces)
+        
+        // Si hay más páginas, obtener más razas
+        if (data.pagination && data.pagination.totalPages > 1) {
+          // Obtener más páginas para asegurar todas las razas
+          const allRacesSet = new Set(uniqueRaces)
+          for (let page = 2; page <= Math.min(10, data.pagination.totalPages); page++) {
+            const pageResponse = await fetch(`/api/admin/cards?limit=1000&page=${page}`)
+            if (pageResponse.ok) {
+              const pageData = await pageResponse.json()
+              pageData.cards.forEach((card: SupabaseCard) => {
+                if (card.race && card.race.trim() !== '') {
+                  allRacesSet.add(card.race)
+                }
+              })
+            }
+          }
+          setAllRaces(Array.from(allRacesSet).sort())
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching races:', error)
+      // Fallback: usar las razas predefinidas si hay error
+      setAllRaces(['Bestia', 'Caballero', 'Dragón', 'Eterno', 'Faerie', 'Guerrero', 'Héroe', 'Sacerdote', 'Sombra', 'Sin Raza'])
+    }
+  }
+
   const fetchCards = async () => {
     try {
       const params = new URLSearchParams()
@@ -74,6 +124,9 @@ export default function AdminCardsPage() {
       params.append('limit', limit.toString())
       if (selectedExpansion) params.append('expansion', selectedExpansion)
       if (searchTerm) params.append('search', searchTerm)
+      if (selectedType) params.append('type', selectedType)
+      if (selectedRace) params.append('race', selectedRace)
+      if (selectedRarity) params.append('rarity', selectedRarity)
 
       const response = await fetch(`/api/admin/cards?${params.toString()}`)
       if (response.ok) {
@@ -101,6 +154,21 @@ export default function AdminCardsPage() {
   const handleSearchChange = (search: string) => {
     setSearchTerm(search)
     setCurrentPage(1) // Resetear a página 1 cuando cambie la búsqueda
+  }
+
+  const handleTypeChange = (type: string) => {
+    setSelectedType(type)
+    setCurrentPage(1)
+  }
+
+  const handleRaceChange = (race: string) => {
+    setSelectedRace(race)
+    setCurrentPage(1)
+  }
+
+  const handleRarityChange = (rarity: string) => {
+    setSelectedRarity(rarity)
+    setCurrentPage(1)
   }
 
   const handlePageChange = (page: number) => {
@@ -158,7 +226,7 @@ export default function AdminCardsPage() {
 
           {/* Filtros */}
           <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-md p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {/* Buscador */}
               <div>
                 <label className="block text-sm font-semibold text-[#F4C430] mb-2">
@@ -176,7 +244,7 @@ export default function AdminCardsPage() {
               {/* Filtro por expansión */}
               <div>
                 <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                  Filtrar por expansión:
+                  Expansión:
                 </label>
                 <select
                   value={selectedExpansion}
@@ -189,6 +257,57 @@ export default function AdminCardsPage() {
                   </option>
                   {allExpansions.map(expansion => (
                     <option key={expansion} value={expansion}>{expansion}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro por tipo */}
+              <div>
+                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                  Tipo:
+                </label>
+                <select
+                  value={selectedType}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                >
+                  <option value="">Todos los tipos</option>
+                  {Object.entries(CARD_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro por raza */}
+              <div>
+                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                  Raza:
+                </label>
+                <select
+                  value={selectedRace}
+                  onChange={(e) => handleRaceChange(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                >
+                  <option value="">Todas las razas</option>
+                  {allRaces.map(race => (
+                    <option key={race} value={race}>{race}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro por rareza */}
+              <div>
+                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                  Rareza:
+                </label>
+                <select
+                  value={selectedRarity}
+                  onChange={(e) => handleRarityChange(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                >
+                  <option value="">Todas las rarezas</option>
+                  {Object.entries(RARITY_TYPE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
               </div>

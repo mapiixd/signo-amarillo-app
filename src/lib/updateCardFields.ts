@@ -34,6 +34,10 @@ interface CardRow {
   damage?: string | number
   Damage?: string | number
   DAMAGE?: string | number
+  rarity?: string
+  Rarity?: string
+  RAREZA?: string
+  rareza?: string
 }
 
 // Mapeo de expansiones a rutas de carpetas (igual que en updateImageUrls.ts)
@@ -110,7 +114,8 @@ function toNumber(value: any): number | null {
 }
 
 async function updateCardFields() {
-  console.log('🔄 Iniciando actualización de description y attack desde Excel...\n')
+  console.log('🔄 Iniciando actualización de description y attack desde Excel para KVSM Titanes...\n')
+  console.log('⚠️  Este script solo procesará el archivo de KVSM Titanes para preservar la integridad de otras ediciones.\n')
 
   // Verificar que existe la carpeta
   if (!fs.existsSync(dataFolder)) {
@@ -118,19 +123,28 @@ async function updateCardFields() {
     process.exit(1)
   }
 
-  // Leer todos los archivos Excel
-  const files = fs.readdirSync(dataFolder).filter(f => f.endsWith('.xlsx') || f.endsWith('.xls'))
-  console.log(`📁 Encontrados ${files.length} archivos Excel\n`)
+  // Leer todos los archivos Excel y filtrar solo KVSM Titanes
+  const allFiles = fs.readdirSync(dataFolder).filter(f => f.endsWith('.xlsx') || f.endsWith('.xls'))
+  const files = allFiles.filter(f => 
+    f.toLowerCase().includes('kvsm') || 
+    f.toLowerCase().includes('titanes')
+  )
+  
+  console.log(`📁 Archivos Excel encontrados: ${allFiles.length}`)
+  console.log(`📁 Archivos KVSM Titanes encontrados: ${files.length}\n`)
 
   if (files.length === 0) {
-    console.log(`⚠️  No se encontraron archivos Excel en "${dataFolder}"`)
+    console.log(`⚠️  No se encontró ningún archivo de KVSM Titanes en "${dataFolder}"`)
+    console.log(`\n💡 Archivos disponibles:`)
+    allFiles.forEach(f => console.log(`   - ${f}`))
+    console.log(`\n💡 El archivo debe contener "kvsm" o "titanes" en el nombre.`)
     process.exit(0)
   }
 
   // Mapa para almacenar edid+expansión -> { description, attack, image_url }
-  // También mapa por nombre+expansión como fallback
+  // También mapa por nombre+expansión+rareza como fallback (para KVSM Titanes)
   const cardFieldsMapByEdid = new Map<string, { description: string | null, attack: number | null, image_url: string | null }>()
-  const cardFieldsMapByName = new Map<string, { description: string | null, attack: number | null }>()
+  const cardFieldsMapByName = new Map<string, { description: string | null, attack: number | null, rarity?: string }>()
 
   // PASO 1: Leer todos los Excel y construir el mapa
   console.log('📖 Leyendo archivos Excel...\n')
@@ -182,11 +196,18 @@ async function updateCardFields() {
           expansion = defaultExpansion
         }
         expansion = normalizeExpansion(expansion)
+        
+        // Asegurar que la expansión sea KVSM Titanes
+        if (!expansion.toLowerCase().includes('titanes') && !expansion.toLowerCase().includes('kvsm')) {
+          continue // Omitir cartas que no sean de KVSM Titanes
+        }
+        expansion = 'Kaiju VS Mecha: Titanes'
 
-        // Extraer edid, ability (description) y damage (attack)
+        // Extraer edid, ability (description), damage (attack) y rarity
         const edid = row.edid || row.Edid || row.EDID || row.EdId || null
         const ability = row.ability || row.Ability || row.ABILITY || null
         const damage = row.damage || row.Damage || row.DAMAGE || null
+        const rarity = row.rarity || row.Rarity || row.RAREZA || row.rareza || null
 
         // Normalizar description: si está vacío o es solo espacios, usar null
         const description = ability && ability.toString().trim() ? ability.toString().trim() : null
@@ -203,9 +224,16 @@ async function updateCardFields() {
           cardFieldsMapByEdid.set(edidKey, { description, attack, image_url })
         }
 
-        // También guardar por nombre+expansión como fallback
-        const nameKey = `${normalizeCardName(name)}|${expansion}`
-        cardFieldsMapByName.set(nameKey, { description, attack })
+        // Guardar por nombre+expansión+rareza (para KVSM Titanes con múltiples rarezas)
+        const rarityStr = rarity ? rarity.toString().trim().toUpperCase() : ''
+        const nameKey = `${normalizeCardName(name)}|${expansion}|${rarityStr}`
+        cardFieldsMapByName.set(nameKey, { description, attack, rarity: rarityStr })
+        
+        // También guardar sin rareza como fallback
+        const nameKeyNoRarity = `${normalizeCardName(name)}|${expansion}`
+        if (!cardFieldsMapByName.has(nameKeyNoRarity)) {
+          cardFieldsMapByName.set(nameKeyNoRarity, { description, attack })
+        }
         
         fileCount++
       }
@@ -219,13 +247,14 @@ async function updateCardFields() {
   console.log(`📊 Total de cartas en mapa por edid: ${cardFieldsMapByEdid.size}`)
   console.log(`📊 Total de cartas en mapa por nombre: ${cardFieldsMapByName.size}\n`)
 
-  // PASO 3: Obtener cartas que necesitan actualización (description null)
-  console.log('🔍 Buscando cartas con description null...\n')
+  // PASO 3: Obtener cartas de KVSM Titanes que necesitan actualización
+  console.log('🔍 Buscando cartas de KVSM Titanes con description null o attack null...\n')
   
   const { data: cardsWithNullDescription, error: nullFetchError } = await supabase
     .from('cards')
-    .select('id, name, expansion, description, attack')
-    .or('description.is.null,description.eq.')
+    .select('id, name, expansion, description, attack, rarity, image_url')
+    .or('expansion.ilike.%titanes%,expansion.ilike.%kvsm%')
+    .or('description.is.null,description.eq.,attack.is.null')
 
   if (nullFetchError) {
     console.error(`❌ Error obteniendo cartas con description null: ${nullFetchError.message}`)
@@ -233,7 +262,7 @@ async function updateCardFields() {
   }
 
   const cardsToUpdate = cardsWithNullDescription || []
-  console.log(`📋 Encontradas ${cardsToUpdate.length} cartas con description null/vacío\n`)
+  console.log(`📋 Encontradas ${cardsToUpdate.length} cartas de KVSM Titanes para verificar\n`)
 
   // PASO 4: Actualizar cartas
   console.log('🔄 Actualizando cartas...\n')
@@ -263,10 +292,20 @@ async function updateCardFields() {
       }
     }
 
-    // PRIORIDAD 2: Buscar por nombre+expansión
+    // PRIORIDAD 2: Buscar por nombre+expansión+rareza (para KVSM Titanes)
     if (!fields) {
-      const nameKey = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}`
-      fields = cardFieldsMapByName.get(nameKey) || null
+      const rarity = (card as any).rarity || ''
+      const rarityStr = rarity ? rarity.toString().trim().toUpperCase() : ''
+      const nameKeyWithRarity = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}|${rarityStr}`
+      const nameKeyWithoutRarity = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}`
+      
+      // Intentar primero con rareza
+      fields = cardFieldsMapByName.get(nameKeyWithRarity) || null
+      
+      // Si no se encuentra, intentar sin rareza
+      if (!fields) {
+        fields = cardFieldsMapByName.get(nameKeyWithoutRarity) || null
+      }
       
       if (fields) {
         matched = true
@@ -390,3 +429,5 @@ updateCardFields()
     console.error('💥 Error fatal:', error)
     process.exit(1)
   })
+
+

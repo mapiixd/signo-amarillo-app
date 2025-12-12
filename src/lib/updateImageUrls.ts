@@ -130,7 +130,8 @@ function buildImageUrl(edid: string | number | null | undefined, expansion: stri
 }
 
 async function updateImageUrls() {
-  console.log('🔄 Iniciando actualización de image_url desde Excel...\n')
+  console.log('🔄 Iniciando actualización de image_url desde Excel para KVSM Titanes...\n')
+  console.log('⚠️  Este script solo procesará el archivo de KVSM Titanes para preservar la integridad de otras ediciones.\n')
 
   // Verificar que existe la carpeta
   if (!fs.existsSync(dataFolder)) {
@@ -138,12 +139,21 @@ async function updateImageUrls() {
     process.exit(1)
   }
 
-  // Leer todos los archivos Excel
-  const files = fs.readdirSync(dataFolder).filter(f => f.endsWith('.xlsx') || f.endsWith('.xls'))
-  console.log(`📁 Encontrados ${files.length} archivos Excel\n`)
+  // Leer todos los archivos Excel y filtrar solo KVSM Titanes
+  const allFiles = fs.readdirSync(dataFolder).filter(f => f.endsWith('.xlsx') || f.endsWith('.xls'))
+  const files = allFiles.filter(f => 
+    f.toLowerCase().includes('kvsm') || 
+    f.toLowerCase().includes('titanes')
+  )
+  
+  console.log(`📁 Archivos Excel encontrados: ${allFiles.length}`)
+  console.log(`📁 Archivos KVSM Titanes encontrados: ${files.length}\n`)
 
   if (files.length === 0) {
-    console.log(`⚠️  No se encontraron archivos Excel en "${dataFolder}"`)
+    console.log(`⚠️  No se encontró ningún archivo de KVSM Titanes en "${dataFolder}"`)
+    console.log(`\n💡 Archivos disponibles:`)
+    allFiles.forEach(f => console.log(`   - ${f}`))
+    console.log(`\n💡 El archivo debe contener "kvsm" o "titanes" en el nombre.`)
     process.exit(0)
   }
 
@@ -223,25 +233,36 @@ async function updateImageUrls() {
 
   console.log(`📊 Total de cartas en mapa: ${cardImageMap.size}\n`)
 
-  // PASO 2: Obtener todas las cartas con image_url null/vacío
-  console.log('🔍 Buscando cartas con image_url null/vacío...\n')
+  // PASO 2: Obtener solo cartas de KVSM Titanes
+  console.log('🔍 Buscando cartas de KVSM Titanes...\n')
   
-  const { data: cardsWithoutImage, error: fetchError } = await supabase
+  // Obtener todas las cartas de KVSM Titanes
+  const { data: kvsmCards, error: kvsmError } = await supabase
     .from('cards')
-    .select('id, name, expansion, image_url')
-    .or('image_url.is.null,image_url.eq.,image_url.eq.null')
+    .select('id, name, expansion, image_url, rarity')
+    .or('expansion.ilike.%titanes%,expansion.ilike.%kvsm%')
 
-  if (fetchError) {
-    console.error(`❌ Error obteniendo cartas: ${fetchError.message}`)
+  if (kvsmError) {
+    console.error(`❌ Error obteniendo cartas KVSM: ${kvsmError.message}`)
     process.exit(1)
   }
 
-  if (!cardsWithoutImage || cardsWithoutImage.length === 0) {
-    console.log('✅ No hay cartas sin image_url')
+  const allCardsToUpdate: Array<{id: string, name: string, expansion: string, image_url: string | null, rarity?: string}> = []
+  
+  if (kvsmCards && kvsmCards.length > 0) {
+    console.log(`📋 Encontradas ${kvsmCards.length} cartas de KVSM Titanes`)
+    allCardsToUpdate.push(...kvsmCards.map(c => ({ ...c, rarity: (c as any).rarity })))
+  } else {
+    console.log('⚠️  No se encontraron cartas de KVSM Titanes')
     process.exit(0)
   }
 
-  console.log(`📋 Encontradas ${cardsWithoutImage.length} cartas sin image_url\n`)
+  if (allCardsToUpdate.length === 0) {
+    console.log('✅ No hay cartas para actualizar')
+    process.exit(0)
+  }
+
+  console.log(`📋 Total de cartas a procesar: ${allCardsToUpdate.length}\n`)
 
   // PASO 3: Actualizar cartas
   console.log('🔄 Actualizando cartas...\n')
@@ -250,8 +271,22 @@ async function updateImageUrls() {
   let notFound = 0
   let errors = 0
 
-  for (const card of cardsWithoutImage) {
-    const key = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}`
+  for (const card of allCardsToUpdate) {
+    // Para KVSM Titanes, usar nombre + rareza + expansión como clave
+    let key: string
+    if (card.expansion.toLowerCase().includes('titanes') || card.expansion.toLowerCase().includes('kvsm')) {
+      // Buscar por nombre + rareza + expansión para KVSM Titanes
+      const rarity = (card as any).rarity || ''
+      key = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}|${rarity}`
+      
+      // Si no se encuentra con rareza, intentar sin rareza
+      if (!cardImageMap.has(key)) {
+        key = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}`
+      }
+    } else {
+      key = `${normalizeCardName(card.name)}|${normalizeExpansion(card.expansion)}`
+    }
+    
     const imageUrl = cardImageMap.get(key)
 
     if (imageUrl) {
@@ -297,3 +332,5 @@ updateImageUrls()
     console.error('💥 Error fatal:', error)
     process.exit(1)
   })
+
+

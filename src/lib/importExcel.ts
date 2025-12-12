@@ -111,7 +111,8 @@ function toNumber(value: any): number | null {
 }
 
 async function importExcel() {
-  console.log('🔄 Iniciando importación de cartas desde Excel...\n')
+  console.log('🔄 Iniciando importación de cartas KVSM Titanes desde Excel...\n')
+  console.log('⚠️  Este script solo procesará el archivo de KVSM Titanes para preservar la integridad de otras ediciones.\n')
 
   // Verificar que existe la carpeta
   if (!fs.existsSync(dataFolder)) {
@@ -120,14 +121,28 @@ async function importExcel() {
     process.exit(1)
   }
 
-  // Leer todos los archivos Excel
-  const files = fs.readdirSync(dataFolder).filter(f => f.endsWith('.xlsx') || f.endsWith('.xls'))
-  console.log(`📁 Encontrados ${files.length} archivos Excel\n`)
+  // Leer todos los archivos Excel y filtrar solo KVSM Titanes
+  const allFiles = fs.readdirSync(dataFolder).filter(f => f.endsWith('.xlsx') || f.endsWith('.xls'))
+  const files = allFiles.filter(f => 
+    f.toLowerCase().includes('kvsm') || 
+    f.toLowerCase().includes('titanes')
+  )
+  
+  console.log(`📁 Archivos Excel encontrados: ${allFiles.length}`)
+  console.log(`📁 Archivos KVSM Titanes encontrados: ${files.length}\n`)
 
   if (files.length === 0) {
-    console.log(`⚠️  No se encontraron archivos Excel en "${dataFolder}"`)
-    console.log(`\n💡 Coloca los archivos Excel (.xlsx o .xls) en la carpeta "data"`)
+    console.log(`⚠️  No se encontró ningún archivo de KVSM Titanes en "${dataFolder}"`)
+    console.log(`\n💡 Archivos disponibles:`)
+    allFiles.forEach(f => console.log(`   - ${f}`))
+    console.log(`\n💡 El archivo debe contener "kvsm" o "titanes" en el nombre.`)
     process.exit(0)
+  }
+
+  if (files.length > 1) {
+    console.log(`⚠️  Se encontraron múltiples archivos de KVSM Titanes:`)
+    files.forEach(f => console.log(`   - ${f}`))
+    console.log(`\n⚠️  Se procesarán todos los archivos encontrados.\n`)
   }
 
   let totalCreated = 0
@@ -157,6 +172,11 @@ async function importExcel() {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ')
       
+      // Normalizar para KVSM Titanes
+      if (defaultExpansion.toLowerCase().includes('kvsm') || defaultExpansion.toLowerCase().includes('titanes')) {
+        defaultExpansion = 'Kaiju VS Mecha: Titanes'
+      }
+      
       // Si la primera fila tiene un nombre que parece ser el título de la expansión, usarlo
       if (data.length > 0 && data[0].name && (data[0].type === 'Oro' || data[0].type === 'ORO')) {
         const firstRowName = data[0].name
@@ -164,6 +184,11 @@ async function importExcel() {
         if (firstRowName.includes(':') || firstRowName.length > 15) {
           defaultExpansion = firstRowName
         }
+      }
+
+      // Asegurar que la expansión sea KVSM Titanes
+      if (!defaultExpansion.toLowerCase().includes('titanes') && !defaultExpansion.toLowerCase().includes('kvsm')) {
+        defaultExpansion = 'Kaiju VS Mecha: Titanes'
       }
 
       for (const row of data) {
@@ -177,6 +202,21 @@ async function importExcel() {
         if (!expansion || /^\d+$/.test(String(expansion))) {
           expansion = defaultExpansion
         }
+        
+        // Normalizar expansión para KVSM Titanes
+        if (expansion.toLowerCase().includes('kvsm') || expansion.toLowerCase().includes('titanes')) {
+          expansion = 'Kaiju VS Mecha: Titanes'
+        }
+        
+        // Validar que solo se procesen cartas de KVSM Titanes
+        if (!expansion.toLowerCase().includes('titanes') && !expansion.toLowerCase().includes('kvsm')) {
+          console.log(`   ├─ ⚠️  Fila omitida: expansión "${expansion}" no es KVSM Titanes`)
+          fileErrors++
+          continue
+        }
+        
+        // Asegurar que la expansión sea exactamente "Kaiju VS Mecha: Titanes"
+        expansion = 'Kaiju VS Mecha: Titanes'
         const race = row.race || row.Race || row.RAZA || row.raza
         const cost = toNumber(row.cost || row.Cost || row.COSTE || row.coste)
         const attack = toNumber(row.attack || row.Attack || row.ATAQUE || row.ataque)
@@ -193,12 +233,14 @@ async function importExcel() {
         }
 
         try {
-          // Buscar si la carta ya existe (mismo nombre y expansión)
+          // Buscar si la carta ya existe (mismo nombre, rareza y expansión)
+          // Esto permite tener múltiples versiones de la misma carta con diferentes rarezas
           const { data: existingCards, error: searchError } = await supabase
             .from('cards')
-            .select('id, name, expansion')
+            .select('id, name, expansion, rarity')
             .ilike('name', name.trim())
             .eq('expansion', expansion.trim())
+            .eq('rarity', rarity)
 
           if (searchError) {
             console.log(`   ├─ ❌ Error buscando "${name}": ${searchError.message}`)
@@ -232,7 +274,7 @@ async function importExcel() {
               console.log(`   ├─ ❌ Error actualizando "${name}": ${updateError.message}`)
               fileErrors++
             } else {
-              console.log(`   ├─ ✅ Actualizada: "${name}" (${expansion})`)
+              console.log(`   ├─ ✅ Actualizada: "${name}" (${expansion}, ${rarity})`)
               fileUpdated++
               expansionStats[expansion] = (expansionStats[expansion] || 0) + 1
             }
@@ -246,7 +288,7 @@ async function importExcel() {
               console.log(`   ├─ ❌ Error creando "${name}": ${insertError.message}`)
               fileErrors++
             } else {
-              console.log(`   ├─ ✅ Creada: "${name}" (${expansion})`)
+              console.log(`   ├─ ✅ Creada: "${name}" (${expansion}, ${rarity})`)
               fileCreated++
               expansionStats[expansion] = (expansionStats[expansion] || 0) + 1
             }
