@@ -17,6 +17,10 @@ interface PaginationInfo {
 }
 
 export default function AdminCardsPage() {
+  useEffect(() => {
+    document.title = 'Administrar Cartas | El Signo Amarillo';
+  }, [])
+
   const [cards, setCards] = useState<SupabaseCard[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedExpansion, setSelectedExpansion] = useState<string>('')
@@ -395,15 +399,18 @@ export default function AdminCardsPage() {
                   <tr key={card.id} className="hover:bg-[#1A2332]">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="w-12 h-16 bg-[#0A0E1A] rounded flex items-center justify-center">
-                        {card.image_url ? (
-                          <img
-                            src={getCardThumbnailUrl(card.image_url)}
-                            alt={card.name}
-                            className="w-full h-full object-cover rounded"
-                          />
-                        ) : (
-                          <span className="text-xs text-[#707070]">Sin imagen</span>
-                        )}
+                        {(() => {
+                          const thumbnailUrl = card.image_url ? getCardThumbnailUrl(card.image_url) : null
+                          return thumbnailUrl ? (
+                            <img
+                              src={thumbnailUrl}
+                              alt={card.name}
+                              className="w-full h-full object-cover rounded"
+                            />
+                          ) : (
+                            <span className="text-xs text-[#707070]">Sin imagen</span>
+                          )
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

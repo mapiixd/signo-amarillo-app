@@ -10,7 +10,7 @@ export default function Footer() {
               alt="El Signo Amarillo" 
               className="w-8 h-8 drop-shadow-[0_0_8px_rgba(244,196,48,0.5)]"
             />
-            <span className="text-xl font-bold text-[#F4C430]">El Signo Amarillo</span>
+            <span className="logo-title text-xl font-bold text-[#F4C430]">El Signo Amarillo</span>
           </div>
 
           {/* Disclaimer sobre Mitos y Leyendas */}

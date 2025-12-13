@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { getSupabaseClient } from '@/lib/supabase-server'
 
 // GET /api/admin/cards - Obtener cartas para administración con paginación
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const { searchParams } = new URL(request.url)
     const expansion = searchParams.get('expansion')
     const search = searchParams.get('search')
@@ -106,6 +99,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/cards - Crear una nueva carta
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const body = await request.json()
     const {
       name,
@@ -129,6 +123,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fecha actual para created_at y updated_at
+    const now = new Date().toISOString()
+
     const { data: card, error } = await supabase
       .from('cards')
       .insert({
@@ -143,7 +140,9 @@ export async function POST(request: NextRequest) {
         rarity,
         expansion,
         race: race || null,
-        is_active: isActive || false
+        is_active: isActive || false,
+        created_at: now,
+        updated_at: now
       })
       .select()
       .single()

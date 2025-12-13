@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
 import type { DeckCardEntry } from '@/types'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 // POST /api/decks/[id]/copy - Copiar un mazo público a los mazos del usuario
 export async function POST(
@@ -17,6 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     const { id } = await params
 
@@ -52,6 +45,9 @@ export async function POST(
     // Crear una copia del mazo con nombre modificado
     const copiedName = `${originalDeck.name} (Copia)`
     
+    // Fecha actual para created_at y updated_at
+    const now = new Date().toISOString()
+    
     const { data: copiedDeck, error: copyError } = await supabase
       .from('decks')
       .insert({
@@ -62,7 +58,9 @@ export async function POST(
         format: originalDeck.format,
         is_public: false, // La copia es privada por defecto
         cards: originalDeck.cards || [],
-        sideboard: originalDeck.sideboard || []
+        sideboard: originalDeck.sideboard || [],
+        created_at: now,
+        updated_at: now
       })
       .select()
       .single()

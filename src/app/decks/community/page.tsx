@@ -18,6 +18,10 @@ interface CommunityDeck extends DeckWithCards {
 
 export default function CommunityDecksPage() {
   const router = useRouter()
+
+  useEffect(() => {
+    document.title = 'Mazos de la Comunidad | El Signo Amarillo';
+  }, [])
   const [decks, setDecks] = useState<CommunityDeck[]>([])
   const [loading, setLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)

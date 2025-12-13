@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { filterCardsInRotation } from '@/lib/rotation'
 
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Forzar que esta ruta sea dinámica para evitar ejecución durante el build
+export const dynamic = 'force-dynamic'
 
 // GET /api/cards - Obtener todas las cartas
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const type = searchParams.get('type')
@@ -310,6 +306,7 @@ export async function GET(request: NextRequest) {
 // POST /api/cards - Crear una nueva carta
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const body = await request.json()
     const { name, type, cost, attack, defense, description, imageUrl, rarity, expansion } = body
 
@@ -319,6 +316,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Fecha actual para created_at y updated_at
+    const now = new Date().toISOString()
 
     const { data: card, error } = await supabase
       .from('cards')
@@ -332,7 +332,9 @@ export async function POST(request: NextRequest) {
         image_url: imageUrl,
         rarity,
         expansion,
-        is_active: false
+        is_active: false,
+        created_at: now,
+        updated_at: now
       })
       .select()
       .single()

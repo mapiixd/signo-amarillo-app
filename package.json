@@ -20,7 +20,10 @@
     "update-races": "tsx src/lib/updateRaces.ts",
     "fix-multi-race": "tsx src/lib/fixMultiRaceCards.ts",
     "update-image-urls": "tsx src/lib/updateImageUrls.ts",
-    "update-card-fields": "tsx src/lib/updateCardFields.ts"
+    "update-card-fields": "tsx src/lib/updateCardFields.ts",
+    "deploy:cloud-run": "bash scripts/deploy-cloud-run.sh",
+    "deploy:cloud-run:setup": "bash scripts/setup-cloud-run.sh",
+    "deploy:cloud-run:update-env": "bash scripts/update-env-cloud-run.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.74.0",
@@ -30,6 +33,7 @@
     "dotenv": "^17.2.3",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.1.6",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",

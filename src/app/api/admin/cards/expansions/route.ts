@@ -1,17 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { getSupabaseClient } from '@/lib/supabase-server'
 
 // GET /api/admin/cards/expansions - Obtener todas las expansiones disponibles
 export async function GET() {
   try {
+    const supabase = getSupabaseClient()
     const { data: expansions, error } = await supabase
       .from('expansions')
       .select('name')

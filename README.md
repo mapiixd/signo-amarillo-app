@@ -1,149 +1,95 @@
 # ⭐ El Signo Amarillo
 
-**Constructor de Mazos para formato Imperio**
+**La plataforma para forjar y compartir tus mazos de Mitos y Leyendas Imperio**
 
-Una aplicación web completa para gestionar barajas de **Mitos y Leyendas** en formato **Imperio**. Inspirada en el universo de Carcosa y el Rey de Amarillo. Construida con Next.js 15, TypeScript, Tailwind CSS y Supabase.
+Una aplicación web completa diseñada para la comunidad de jugadores de **Mitos y Leyendas** en formato **Imperio**. Inspirada en el universo místico de Carcosa y el Rey de Amarillo, esta plataforma te permite explorar cartas, construir mazos, gestionar tu colección y compartir tus creaciones con la comunidad.
 
-> 🎉 **Nueva Migración JSONB:** Aplicación optimizada - 16x más rápida, 98.5% menos filas en BD. Ver [`EMPIEZA_AQUI.md`](./EMPIEZA_AQUI.md) para migrar.
+> 🎉 **Optimización JSONB:** Aplicación optimizada - 16x más rápida, 98.5% menos filas en BD. Ver [`EMPIEZA_AQUI.md`](./EMPIEZA_AQUI.md) para migrar.
 
-## ✨ Características
+## 🎯 ¿Qué hace este sitio?
 
-- 📚 **Colección de Cartas**: Explora todas las cartas disponibles con imágenes reales
-- 🛠️ **Constructor de Barajas**: Crea y personaliza tus propias decks
-- 📊 **Gestión de Decks**: Organiza y administra tus barajas guardadas
-- 🔐 **Sistema de Autenticación**: Registro, login y roles (Usuario/Admin)
-- 👥 **Gestión de Usuarios**: Cada usuario puede crear sus propios mazos
-- ⚙️ **Panel de Administración**: CRUD completo para gestionar cartas (solo admin)
-- 🖼️ **Imágenes Reales**: Más de 2000 imágenes de cartas integradas
-- 🔄 **Base de Datos Escalables**: Supabase con PostgreSQL
+**El Signo Amarillo** es una plataforma completa para jugadores de Mitos y Leyendas que incluye:
 
-## 🚀 Inicio Rápido
+### 📚 Grimorio de Cartas (`/cards`)
+- **Exploración completa**: Navega por todas las cartas disponibles en formato Imperio
+- **Búsqueda avanzada**: Filtra por tipo, expansión, raza, coste y más
+- **Imágenes reales**: Más de 2000 imágenes de cartas de alta calidad
+- **Detalles completos**: Visualiza toda la información de cada carta (estadísticas, habilidades, rareza, etc.)
+- **Información de banlist**: Consulta el estado de cada carta (permitida, limitada o prohibida)
 
-### 1. Configurar Supabase
+### 🛠️ Forja de Mazos (`/decks/new`)
+- **Constructor visual**: Crea tus mazos arrastrando y soltando cartas
+- **Validación automática**: El sistema verifica que tu mazo cumpla con las reglas del formato Imperio:
+  - Mazo principal: exactamente 50 cartas
+  - Mazo de refuerzo: exactamente 15 cartas
+  - Límites de copias por carta (máximo 3, excepto Oro: hasta 10)
+  - Restricciones raciales para aliados
+- **Gestión de sideboard**: Organiza tu mazo de refuerzo fácilmente
+- **Vista previa**: Visualiza tu mazo antes de guardarlo
+- **Exportar**: Genera imágenes o listas de tu mazo
 
-Sigue las instrucciones en [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) para crear tu proyecto en Supabase.
+### 📊 Mis Mazos (`/decks`)
+- **Gestión personal**: Organiza todos tus mazos guardados
+- **Edición**: Modifica tus mazos existentes
+- **Eliminación**: Borra mazos que ya no necesites
+- **Búsqueda**: Encuentra rápidamente tus mazos por nombre o raza
 
-### 1.5. (Opcional) Configurar CDN para Imágenes
+### 👥 Mazos de la Comunidad (`/decks/community`)
+- **Compartir**: Publica tus mazos para que otros los vean
+- **Explorar**: Descubre mazos creados por otros jugadores
+- **Inspiración**: Encuentra nuevas estrategias y combinaciones
 
-Para servir las imágenes desde un CDN rápido y económico:
-- **Bunny.net**: Ver [`BUNNY_CDN_SETUP.md`](./BUNNY_CDN_SETUP.md) - Recomendado (~$2/mes para 2.7GB)
+### 📋 Banlist (`/banlist`)
+- **Consulta completa**: Revisa todas las cartas prohibidas y limitadas
+- **Información detallada**: Entiende por qué cada carta está restringida
+- **Filtros**: Busca por nombre, tipo o estado de restricción
+- **Actualizaciones**: Mantente al día con los cambios en las reglas
 
-### 2. Instalar dependencias
+### ⚙️ Panel de Administración (`/admin/cards`) - Solo Admin
+- **Gestión de cartas**: CRUD completo para administrar la base de datos de cartas
+- **Importación masiva**: Carga cartas desde archivos Excel
+- **Actualización de imágenes**: Asigna y actualiza imágenes de cartas
+- **Gestión de expansiones**: Administra las expansiones disponibles
 
-```bash
-npm install
-```
+## ✨ Características Principales
 
-### 3. Configurar variables de entorno
-
-Crea un archivo `.env.local` con tus credenciales de Supabase y autenticación:
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="[TU-ANON-KEY]"
-
-# Autenticación (JWT)
-JWT_SECRET="tu-clave-secreta-super-larga-y-segura-aqui"
-```
-
-### 4. Configurar la base de datos
-
-**Opción A: Setup automático (recomendado)**
-```bash
-npm run setup
-```
-
-**Opción B: Setup manual**
-```bash
-# Poblar con cartas iniciales
-npm run seed-cards
-
-# Asignar imágenes a las cartas
-npm run update-images
-```
-
-### 5. Crear usuario administrador
-
-```bash
-npm run create-admin
-```
-
-Ingresa nombre de usuario, correo y contraseña para crear tu primer administrador.
-
-### 6. Iniciar servidor de desarrollo
-
-```bash
-npm run dev
-```
-
-Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+- 🎨 **Diseño temático**: Interfaz inspirada en Carcosa con colores místicos (amarillo del Rey, cyan místico)
+- 🔐 **Autenticación completa**: Sistema de registro, login y gestión de usuarios
+- 👤 **Perfiles de usuario**: Cada usuario puede crear y gestionar sus propios mazos
+- 🛡️ **Roles y permisos**: Sistema de administradores con acceso a funciones especiales
+- 🖼️ **CDN integrado**: Soporte para servir imágenes desde Bunny.net CDN (opcional)
+- ⚡ **Rendimiento optimizado**: Base de datos JSONB para consultas ultra-rápidas
+- 📱 **Responsive**: Diseño adaptativo que funciona en móviles, tablets y desktop
+- 🌙 **Tema oscuro**: Interfaz oscura que reduce la fatiga visual
 
 ## 🔐 Sistema de Autenticación
 
 La aplicación incluye un sistema completo de autenticación:
 
 - **Registro** (`/register`) - Crea una cuenta nueva
-- **Login** (`/login`) - Inicia sesión
+- **Login** (`/login`) - Inicia sesión con tu cuenta
 - **Roles**: Usuario (por defecto) y Administrador
-- **Protección de rutas** - Middleware automático
+- **Protección de rutas** - Middleware automático que protege rutas privadas
 - **Sesiones JWT** - Cookies seguras con expiración de 7 días
-
-**Ver documentación completa**: [`AUTH_SETUP.md`](./AUTH_SETUP.md)  
-**Guía rápida**: [`AUTH_QUICKSTART.md`](./AUTH_QUICKSTART.md)
-
-## 📁 Estructura del Proyecto
-
-```
-decks-imperio/
-├── public/
-│   └── cards/                # Imágenes de cartas organizadas por expansión
-├── src/
-│   ├── app/                  # Páginas Next.js (App Router)
-│   │   ├── admin/           # Panel de administración
-│   │   ├── api/             # API Routes
-│   │   ├── cards/           # Página de colección
-│   │   ├── decks/           # Gestión de barajas
-│   │   └── page.tsx         # Página principal
-│   ├── components/          # Componentes reutilizables
-│   ├── lib/                 # Utilidades y configuración
-│   └── types/               # Definiciones TypeScript
-└── SUPABASE_SETUP.md        # Guía de configuración de Supabase
-```
-
-## 🛠️ Comandos Disponibles
-
-```bash
-# Desarrollo
-npm run dev              # Servidor de desarrollo
-npm run build           # Construir para producción
-npm run start           # Servidor de producción
-
-# Base de datos
-npm run seed-cards      # Poblar con cartas de ejemplo
-npm run update-images   # Asignar imágenes a cartas
-
-# Autenticación
-npm run create-admin    # Crear usuario administrador
-
-# CDN (opcional)
-npm run upload-to-bunny # Subir imágenes a Bunny.net CDN
-
-# Utilidades
-npm run lint            # Ejecutar ESLint
-```
+- **Gestión de perfil** - Los usuarios pueden ver y gestionar su información
 
 ## 🗄️ Modelo de Datos
 
 ### Carta (Card)
 - **Tipos**: Talismán, Arma, Tótem, Aliado, Oro
-- **Campos**: Nombre, tipo, coste, fuerza/defensa, rareza, expansión
-- **Imágenes**: Integradas automáticamente desde `/public/cards/`
+- **Campos**: Nombre, tipo, coste, fuerza/defensa, rareza, expansión, raza, imagen
+- **Imágenes**: Integradas automáticamente desde `/public/cards/` o CDN
+- **Banlist**: Estado de restricción (permitida, limitada, prohibida)
 
 ### Baraja (Deck)
 - **Estructura**: JSONB optimizada (ver [`DECK_STRUCTURE_JSONB.md`](./DECK_STRUCTURE_JSONB.md))
-- **Campos**: Nombre, descripción, raza, formato, cartas (JSONB), sideboard (JSONB)
+- **Campos**: Nombre, descripción, raza, formato, cartas (JSONB), sideboard (JSONB), usuario_id, público
 - **Ventajas**: 98% menos filas en BD, queries más rápidas, mejor escalabilidad
+- **Privacidad**: Los usuarios pueden hacer sus mazos públicos o privados
+
+### Usuario (User)
+- **Campos**: id, username, email, password_hash, role
+- **Roles**: USER (por defecto), ADMIN (acceso a panel de administración)
 
 ## 🎯 Formato Imperio Racial
 
@@ -151,39 +97,74 @@ npm run lint            # Ejecutar ESLint
 - **Máximo 3 copias** por carta (excepto Oro: hasta 10)
 - **Solo aliados** de la raza seleccionada
 - **Máximo 4 aliados** sin raza
+- **Validación automática** en el constructor
 
 ### Mazo de Refuerzo (15 cartas exactas)
 - **Sideboard**: Cartas intercambiables entre partidas
 - **Máximo 3 copias** por carta (excepto Oro: hasta 10)
 - **Puede incluir** aliados de otras razas
+- **Flexibilidad estratégica** para adaptarse a diferentes oponentes
 
 ### Sistema de Banlist
 - ❌ **Prohibidas**: No permitidas en ningún formato
 - ⚠️ **Limitadas**: Máximo 1-2 copias según carta
+- ✅ **Permitidas**: Sin restricciones
 - Ver [`BANLIST_SYSTEM.md`](./BANLIST_SYSTEM.md) para lista completa
+
+## 🎨 Diseño y Temática
+
+El sitio está inspirado en el universo de **Carcosa** y el **Rey de Amarillo**:
+
+- **Colores principales**:
+  - Amarillo del Rey (#F4C430) - Títulos y acentos principales
+  - Cyan Místico (#2D9B96) - Enlaces y elementos secundarios
+  - Fondo oscuro (#0A0E1A) - Base oscura para reducir fatiga visual
+  
+- **Tipografía**:
+  - **Cinzel** - Fuente principal (serif elegante)
+  - **Cormorant Garamond** - Fuente secundaria disponible
+
+- **Efectos visuales**:
+  - Glow effects (resplandores) en elementos interactivos
+  - Sombras con colores temáticos
+  - Transiciones suaves en hover
 
 ## 🔧 Tecnologías
 
-- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes, Supabase
-- **Base de datos**: Supabase (PostgreSQL)
-- **Despliegue**: Vercel (recomendado)
+- **Frontend**: 
+  - Next.js 15 (App Router)
+  - React 19
+  - TypeScript
+  - Tailwind CSS v4
+  - SweetAlert2 (alertas elegantes)
 
-## 🚀 Despliegue en Vercel
+- **Backend**: 
+  - Next.js API Routes
+  - JWT para autenticación
+  - bcryptjs para hash de contraseñas
 
-1. Conecta tu repositorio a [Vercel](https://vercel.com)
-2. Configura las variables de entorno en Vercel
-3. Despliega automáticamente
+- **Base de datos**: 
+  - Supabase (PostgreSQL)
+  - JSONB para optimización de queries
 
-## 📝 Próximos Pasos
+- **Despliegue**: 
+  - Vercel (recomendado para Next.js)
+  - Google Cloud Run (alternativa con Docker)
 
-- [ ] Sistema de autenticación de usuarios
-- [ ] Guardado de decks por usuario
-- [ ] Comunidad para compartir decks
-- [ ] Estadísticas y análisis de decks
+## 📝 Características Futuras
+
+- [ ] Sistema de favoritos para cartas y mazos
+- [ ] Estadísticas y análisis de mazos
+- [ ] Sistema de comentarios en mazos de la comunidad
+- [ ] Exportación de mazos en diferentes formatos
 - [ ] API pública para integraciones
+- [ ] Sistema de notificaciones
+- [ ] Historial de cambios en mazos
+- [ ] Comparador de mazos
 
 ## 🤝 Contribuir
+
+Las contribuciones son bienvenidas. Para contribuir:
 
 1. Fork el proyecto
 2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
@@ -191,12 +172,25 @@ npm run lint            # Ejecutar ESLint
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
+## ⚠️ Disclaimer
+
+Este es un proyecto **no oficial** y **sin fines de lucro**, creado por fans para fans de Mitos y Leyendas. 
+
+- **Mitos y Leyendas** y sus respectivas artes de cartas son propiedad de sus creadores.
+- Este proyecto está hecho para ayudar a la comunidad de jugadores del formato Imperio.
+- No está afiliado ni respaldado oficialmente por los creadores de Mitos y Leyendas.
+
 ## 📄 Licencia
 
 Este proyecto está bajo la Licencia MIT.
 
 ## 🙏 Agradecimientos
 
-- Comunidad de Mitos y Leyendas
-- Equipo de Supabase
-- Comunidad de Next.js
+- Comunidad de jugadores de Mitos y Leyendas
+- Equipo de Supabase por su excelente plataforma
+- Comunidad de Next.js por las herramientas increíbles
+- Todos los contribuidores y usuarios de la plataforma
+
+---
+
+**⭐ Construye tu imperio, carta por carta. En Carcosa, donde las leyendas cobran vida.**

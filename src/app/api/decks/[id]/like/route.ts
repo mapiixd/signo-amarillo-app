@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 // POST /api/decks/[id]/like - Dar like o quitar like a un mazo
 export async function POST(
@@ -16,6 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     const { id } = await params
 
@@ -102,6 +95,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     const { id } = await params
 

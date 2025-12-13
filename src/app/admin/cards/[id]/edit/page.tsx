@@ -38,6 +38,10 @@ interface CardFormData {
 export default function EditCardPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { id } = use(params)
+
+  useEffect(() => {
+    document.title = 'Editar Carta | El Signo Amarillo';
+  }, [])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [expansions, setExpansions] = useState<string[]>([])
@@ -306,20 +310,23 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-shrink-0">
                   <div className="w-full md:w-64 h-auto md:h-[22rem] bg-gradient-to-br from-[#0A0E1A] to-[#1A2332] rounded-xl flex items-center justify-center overflow-hidden border-2 border-[#2D9B96] shadow-lg">
-                    {formData.imageUrl ? (
-                      <img
-                        src={getCardFullImageUrl(formData.imageUrl)}
-                        alt="Vista previa"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="text-center p-4">
-                        <svg className="w-16 h-16 mx-auto text-[#4ECDC4] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-sm text-[#4ECDC4]">Sin imagen</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const imageUrl = formData.imageUrl ? getCardFullImageUrl(formData.imageUrl) : null
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt="Vista previa"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-center p-4">
+                          <svg className="w-16 h-16 mx-auto text-[#4ECDC4] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-sm text-[#4ECDC4]">Sin imagen</span>
+                        </div>
+                      )
+                    })()}
                   </div>
                   <p className="text-xs text-[#4ECDC4] text-center mt-2">Vista previa de la carta</p>
                 </div>

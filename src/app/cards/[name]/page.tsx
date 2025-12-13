@@ -17,6 +17,14 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null)
 
   useEffect(() => {
+    if (selectedCard) {
+      document.title = `${selectedCard.name} | El Signo Amarillo`;
+    } else {
+      document.title = 'Detalle de Carta | El Signo Amarillo';
+    }
+  }, [selectedCard])
+
+  useEffect(() => {
     fetchCardVersions()
   }, [decodedName])
 
@@ -120,18 +128,21 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-8">
               <div className="bg-[#121825] rounded-xl shadow-lg border-2 border-[#2D9B96] overflow-hidden border-mystic">
-                {card.image_url ? (
-                  <img
-                    src={getCardImageUrl(card.image_url)}
-                    alt={card.name}
-                    className="w-full h-auto object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="aspect-[2/3] flex items-center justify-center bg-gradient-to-br from-[#1A2332] to-[#121825]">
-                    <span className="text-[#4ECDC4]">Sin imagen</span>
-                  </div>
-                )}
+                {(() => {
+                  const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
+                  return imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={card.name}
+                      className="w-full h-auto object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="aspect-[2/3] flex items-center justify-center bg-gradient-to-br from-[#1A2332] to-[#121825]">
+                      <span className="text-[#4ECDC4]">Sin imagen</span>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -212,18 +223,21 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
                           {/* Miniatura */}
                           <div className="w-20 flex-shrink-0">
                             <div className="aspect-[2/3] bg-[#121825] rounded overflow-hidden border border-[#1A7F7A]">
-                              {version.image_url ? (
-                                <img
-                                  src={getCardImageUrl(version.image_url)}
-                                  alt={`${version.name} - ${version.expansion}`}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <span className="text-xs text-[#4ECDC4]">Sin imagen</span>
-                                </div>
-                              )}
+                              {(() => {
+                                const imageUrl = version.image_url ? getCardImageUrl(version.image_url) : null
+                                return imageUrl ? (
+                                  <img
+                                    src={imageUrl}
+                                    alt={`${version.name} - ${version.expansion}`}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <span className="text-xs text-[#4ECDC4]">Sin imagen</span>
+                                  </div>
+                                )
+                              })()}
                             </div>
                           </div>
 
@@ -269,7 +283,7 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
             {cards.length === 1 && (
               <div className="bg-[#1A2332] border border-[#2D9B96] rounded-lg p-4">
                 <p className="text-[#4ECDC4] text-sm">
-                  ℹ️ Esta carta solo tiene una versión disponible en la base de datos.
+                  ℹ️ Esta carta solo tiene una versión disponible.
                 </p>
               </div>
             )}

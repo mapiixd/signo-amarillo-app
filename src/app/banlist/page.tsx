@@ -7,21 +7,79 @@ import Footer from '@/components/Footer'
 import type { Card } from '@/types'
 
 interface CardWithImage extends Card {
-  banStatus?: 'banned' | 'limited-1' | 'limited-2'
+  banStatus?: 'banned' | 'limited-1' | 'limited-2' | 'allowed'
 }
 
 export default function BanlistPage() {
   const formats: FormatType[] = ['Imperio Racial', 'VCR', 'Triadas']
   const [cardsMap, setCardsMap] = useState<Map<string, CardWithImage>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [imagesLoaded, setImagesLoaded] = useState(false)
+
+  useEffect(() => {
+    document.title = 'Banlist | El Signo Amarillo';
+  }, [])
 
   useEffect(() => {
     fetchBanlistCards()
   }, [])
 
+  // Función para pre-cargar una imagen
+  const preloadImage = (src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!src) {
+        resolve() // Si no hay imagen, considerar como cargada
+        return
+      }
+      
+      const img = new Image()
+      img.onload = () => resolve()
+      img.onerror = () => resolve() // Considerar como cargada incluso si falla
+      img.src = src
+    })
+  }
+
+  // Pre-cargar todas las imágenes antes de mostrar el contenido
+  useEffect(() => {
+    if (cardsMap.size === 0 || loading) return
+
+    const preloadAllImages = async () => {
+      setImagesLoaded(false)
+      const imageUrls: string[] = []
+
+      // Recopilar todas las URLs de imágenes
+      formats.forEach(format => {
+        BANLISTS[format].forEach(entry => {
+          const card = cardsMap.get(entry.cardName)
+          if (card && (card.image_url || card.image_file)) {
+            const imageUrl = getCardImageUrl(card.image_url || card.image_file, card.expansion)
+            if (imageUrl) {
+              imageUrls.push(imageUrl)
+            }
+          }
+        })
+      })
+
+      // Pre-cargar todas las imágenes
+      try {
+        await Promise.all(imageUrls.map(url => preloadImage(url)))
+      } catch (error) {
+        console.error('Error preloading images:', error)
+      } finally {
+        // Pequeño delay para asegurar que las imágenes estén renderizadas
+        setTimeout(() => {
+          setImagesLoaded(true)
+        }, 100)
+      }
+    }
+
+    preloadAllImages()
+  }, [cardsMap, loading])
+
   const fetchBanlistCards = async () => {
     try {
       setLoading(true)
+      setImagesLoaded(false)
       
       // Obtener todas las cartas de la banlist en una sola petición
       const response = await fetch('/api/cards/banlist')
@@ -79,6 +137,20 @@ export default function BanlistPage() {
     }
   }
 
+  // Mostrar pantalla de carga completa mientras se cargan los datos o las imágenes
+  if (loading || !imagesLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F4C430] mx-auto mb-4 signo-glow"></div>
+          <p className="text-[#4ECDC4] font-medium">
+            {loading ? 'Cargando cartas del conocimiento prohibido...' : 'Preparando imágenes de la banlist...'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col flex-1 bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A]">
       <div className="flex-1 container mx-auto px-4 py-6 sm:py-8">
@@ -87,12 +159,6 @@ export default function BanlistPage() {
           <p className="text-[#A0A0A0] text-sm sm:text-base">
             Cartas prohibidas y limitadas por formato
           </p>
-          {loading && (
-            <div className="mt-4 flex items-center gap-2 text-[#4ECDC4]">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#4ECDC4]"></div>
-              <span className="text-sm">Cargando imágenes de cartas...</span>
-            </div>
-          )}
         </div>
 
         <div className="space-y-8">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Footer from '@/components/Footer'
 
@@ -11,6 +11,10 @@ export default function FormatSelectPage() {
   const router = useRouter()
   const [selectedFormat, setSelectedFormat] = useState<Format>(null)
   const [selectedRace, setSelectedRace] = useState<Race>(null)
+
+  useEffect(() => {
+    document.title = 'Elegir Formato | El Signo Amarillo';
+  }, [])
 
   const races: Array<{ name: Race, image: string }> = [
     { name: 'Bestia', image: '/razas/Bestia.png' },

@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
 import type { DeckCardEntry } from '@/types'
 
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Forzar que esta ruta sea dinámica para evitar ejecución durante el build
+export const dynamic = 'force-dynamic'
 
 // GET /api/decks - Obtener todas las barajas del usuario autenticado
 export async function GET() {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     
     // Obtener decks del usuario con JSONB - 1 query simple!
@@ -101,6 +97,7 @@ export async function GET() {
 // POST /api/decks - Crear una nueva baraja
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     
     const body = await request.json()
@@ -131,6 +128,9 @@ export async function POST(request: NextRequest) {
       quantity: card.quantity || 1
     }))
 
+    // Fecha actual para created_at y updated_at
+    const now = new Date().toISOString()
+
     // Crear el deck con JSONB - 1 query simple!
     const { data: deck, error: deckError } = await supabase
       .from('decks')
@@ -142,7 +142,9 @@ export async function POST(request: NextRequest) {
         format: 'Imperio Racial',
         is_public: is_public || false,
         cards: cardsArray,
-        sideboard: sideboardArray
+        sideboard: sideboardArray,
+        created_at: now,
+        updated_at: now
       })
       .select()
       .single()

@@ -1,24 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { getSupabaseClient } from '@/lib/supabase-server'
 
 // GET /api/admin/cards/[id] - Obtener una carta específica
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
+    const { id } = await params
     const { data: card, error } = await supabase
       .from('cards')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) {
@@ -44,9 +38,11 @@ export async function GET(
 // PUT /api/admin/cards/[id] - Actualizar una carta
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
+    const { id } = await params
     const body = await request.json()
     const {
       name,
@@ -70,6 +66,9 @@ export async function PUT(
       )
     }
 
+    // Fecha actual para updated_at
+    const now = new Date().toISOString()
+
     const { data: card, error } = await supabase
       .from('cards')
       .update({
@@ -84,9 +83,10 @@ export async function PUT(
         rarity,
         expansion,
         race: race || null,
-        is_active: isActive || false
+        is_active: isActive || false,
+        updated_at: now
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
@@ -107,13 +107,15 @@ export async function PUT(
 // DELETE /api/admin/cards/[id] - Eliminar una carta
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
+    const { id } = await params
     const { error } = await supabase
       .from('cards')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (error) {
       throw error

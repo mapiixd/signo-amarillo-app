@@ -95,20 +95,16 @@ export default function Navbar() {
           {/* Logo/Home - El Signo Amarillo */}
           <Link 
             href="/" 
-            className="flex items-center space-x-2 md:space-x-3 hover:opacity-90 transition-all group"
+            className="flex items-center hover:opacity-90 transition-all group"
           >
-            {/* Símbolo del Signo Amarillo */}
-            <div className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center">
+            {/* Logo completo con texto */}
+            <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 bg-[#F4C430] rounded-lg opacity-10 group-hover:opacity-20 transition-opacity blur-sm"></div>
               <img 
-                src="/logo-icon.png" 
+                src="/Logo esquina.png" 
                 alt="El Signo Amarillo" 
-                className="w-8 h-8 md:w-10 md:h-10 relative z-10 drop-shadow-[0_0_8px_rgba(244,196,48,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(244,196,48,0.7)] transition-all"
+                className="h-14 md:h-16 relative z-10 drop-shadow-[0_0_8px_rgba(244,196,48,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(244,196,48,0.7)] transition-all object-contain"
               />
-            </div>
-            <div className="hidden sm:flex flex-col">
-              <span className="text-lg md:text-xl font-bold text-[#F4C430] tracking-wide">El Signo Amarillo</span>
-              <span className="text-xs text-[#2D9B96]">Constructor de Mazos</span>
             </div>
           </Link>
 

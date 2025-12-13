@@ -38,6 +38,10 @@ export default function NewCardPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [expansions, setExpansions] = useState<string[]>([])
+
+  useEffect(() => {
+    document.title = 'Nueva Carta | El Signo Amarillo';
+  }, [])
   const [expansionsLoading, setExpansionsLoading] = useState(true)
   const [formData, setFormData] = useState<CardFormData>({
     name: '',

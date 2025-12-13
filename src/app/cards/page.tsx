@@ -12,6 +12,9 @@ interface Expansion {
 }
 
 export default function CardsPage() {
+  useEffect(() => {
+    document.title = 'Grimorio de Cartas | El Signo Amarillo'
+  }, [])
   const [allCards, setAllCards] = useState<CardType[]>([])
   const [displayedCards, setDisplayedCards] = useState<CardType[]>([])
   const [expansions, setExpansions] = useState<Expansion[]>([])
@@ -114,8 +117,8 @@ export default function CardsPage() {
       // Obtener todas las cartas sin filtros para extraer los tipos únicos
       const response = await fetch('/api/cards')
       if (response.ok) {
-        const data = await response.json()
-        const uniqueTypes = Array.from(new Set(data.map((card: CardType) => card.type)))
+        const data = await response.json() as CardType[]
+        const uniqueTypes = Array.from(new Set(data.map((card: CardType) => card.type))) as string[]
         setAllUniqueTypes(uniqueTypes)
       }
     } catch (error) {

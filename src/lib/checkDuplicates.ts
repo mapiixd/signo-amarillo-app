@@ -35,6 +35,7 @@ interface CardRow {
   attack?: number | string
   defense?: number | string
   race?: string
+  _rowIndex?: number
 }
 
 async function checkDuplicates() {

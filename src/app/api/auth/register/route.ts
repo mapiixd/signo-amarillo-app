@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase-server';
 import { createToken, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { nanoid } from 'nanoid';
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient();
     const body = await request.json();
     const { username, email, password } = body;
 
@@ -63,14 +61,23 @@ export async function POST(request: NextRequest) {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generar ID único para el usuario (formato corto como yrUbiknctZipLFnD)
+    const userId = nanoid();
+
+    // Fecha actual para createdAt y updatedAt
+    const now = new Date().toISOString();
+
     // Crear usuario
     const { data: user, error: insertError } = await supabase
       .from('users')
       .insert({
+        id: userId,
         username,
         email,
         password: hashedPassword,
         role: 'USER', // Por defecto es USER
+        createdAt: now,
+        updatedAt: now,
       })
       .select()
       .single();

@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { BANLISTS, type FormatType } from '@/lib/banlist'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 // GET /api/cards/banlist - Obtener todas las cartas de la banlist
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     // Obtener todos los nombres de cartas de todas las banlists
     const allCardNames = new Set<string>()
     const formats: FormatType[] = ['Imperio Racial', 'VCR', 'Triadas']

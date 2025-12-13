@@ -4,8 +4,15 @@ import { useState, useEffect } from 'react'
 import { DeckWithCards } from '@/types'
 import { DeckList } from '@/components/DeckList'
 import Footer from '@/components/Footer'
+import type { Metadata } from 'next'
+
+// Nota: metadata no se puede exportar en componentes 'use client'
+// Se manejará con useEffect o se puede crear un componente wrapper
 
 export default function DecksPage() {
+  useEffect(() => {
+    document.title = 'Mi Colección | El Signo Amarillo'
+  }, [])
   const [decks, setDecks] = useState<DeckWithCards[]>([])
   const [loading, setLoading] = useState(true)
 

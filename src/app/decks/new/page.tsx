@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Swal from 'sweetalert2'
 import { Card as CardType, CARD_TYPE_LABELS } from '@/types'
@@ -19,7 +19,10 @@ interface Expansion {
   display_order: number
 }
 
-export default function NewDeckPage() {
+function NewDeckPageContent() {
+  useEffect(() => {
+    document.title = 'Forja de Mazos | El Signo Amarillo';
+  }, [])
   const router = useRouter()
   const searchParams = useSearchParams()
   const raceParam = searchParams.get('race')
@@ -496,7 +499,7 @@ export default function NewDeckPage() {
             Formato: Imperio Racial | Solo se mostrarán aliados de raza {deckRace} o sin raza
           </p>
           <p className="text-[#F4C430] text-xs italic">
-            📋 Rotación activa: Solo cartas desde "Espiritu Samurai" en adelante están disponibles
+          📋 Rotación activa: Espíritu Samurai - KvsM : Titanes
           </p>
         </div>
 
@@ -929,17 +932,20 @@ export default function NewDeckPage() {
                 {/* Imagen de la carta */}
                 <div className="flex justify-center">
                   <div className="w-full max-w-md">
-                    {selectedCardForView.image_url ? (
-                      <img
-                        src={getCardImageUrl(selectedCardForView.image_url)}
-                        alt={selectedCardForView.name}
-                        className="w-full h-auto rounded-lg border-2 border-[#2D9B96] shadow-lg"
-                      />
-                    ) : (
-                      <div className="aspect-[3/4] bg-[#1A2332] rounded-lg border-2 border-[#2D9B96] flex items-center justify-center">
-                        <span className="text-[#4ECDC4]">Sin imagen</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const imageUrl = selectedCardForView.image_url ? getCardImageUrl(selectedCardForView.image_url) : null
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={selectedCardForView.name}
+                          className="w-full h-auto rounded-lg border-2 border-[#2D9B96] shadow-lg"
+                        />
+                      ) : (
+                        <div className="aspect-[3/4] bg-[#1A2332] rounded-lg border-2 border-[#2D9B96] flex items-center justify-center">
+                          <span className="text-[#4ECDC4]">Sin imagen</span>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
 
@@ -1030,6 +1036,21 @@ export default function NewDeckPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function NewDeckPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F4C430] mx-auto mb-4 signo-glow"></div>
+          <p className="text-[#4ECDC4]">Cargando...</p>
+        </div>
+      </div>
+    }>
+      <NewDeckPageContent />
+    </Suspense>
   )
 }
 

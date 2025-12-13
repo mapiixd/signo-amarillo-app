@@ -54,3 +54,5 @@ npm run reset-import-all
 - Si una carta con el mismo nombre y expansión ya existe, se actualizará en lugar de crear una duplicada
 
 
+
+

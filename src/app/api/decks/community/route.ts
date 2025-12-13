@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
 import type { DeckCardEntry } from '@/types'
 
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Forzar que esta ruta sea dinámica para evitar ejecución durante el build
+export const dynamic = 'force-dynamic'
 
 // GET /api/decks/community - Obtener mazos públicos de la comunidad
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient()
     // Requerir autenticación para ver mazos de la comunidad
     await requireAuth()
     const { searchParams } = new URL(request.url)

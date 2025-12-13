@@ -23,6 +23,14 @@ export default function DeckViewPage() {
   const searchParams = useSearchParams()
   const [deck, setDeck] = useState<DeckWithLikes | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (deck) {
+      document.title = `${deck.name} | El Signo Amarillo`;
+    } else {
+      document.title = 'Ver Mazo | El Signo Amarillo';
+    }
+  }, [deck])
   const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
   const [exporting, setExporting] = useState(false)
   const [isLiked, setIsLiked] = useState(false)

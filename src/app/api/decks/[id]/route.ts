@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
+import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
 import type { DeckCardEntry } from '@/types'
-
-// Cargar variables de entorno
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 // PUT /api/decks/[id] - Actualizar una baraja
 export async function PUT(
@@ -17,6 +9,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     const { id } = await params
     
@@ -73,6 +66,9 @@ export async function PUT(
       quantity: card.quantity || 1
     }))
 
+    // Fecha actual para updated_at
+    const now = new Date().toISOString()
+
     // Actualizar el deck con JSONB
     const { data: deck, error: updateError } = await supabase
       .from('decks')
@@ -82,7 +78,8 @@ export async function PUT(
         race,
         is_public: is_public || false,
         cards: cardsArray,
-        sideboard: sideboardArray
+        sideboard: sideboardArray,
+        updated_at: now
       })
       .eq('id', id)
       .select()
@@ -159,6 +156,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabase = getSupabaseClient()
     const user = await requireAuth()
     const { id } = await params
 
