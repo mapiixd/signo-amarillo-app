@@ -46,15 +46,38 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Crear un mapa de cartas por nombre (normalizado)
+    // Orden de rareza de menor a mayor (menor rareza = versión base)
+    const rarityOrder: Record<string, number> = {
+      'VASALLO': 1,
+      'CORTESANO': 2,
+      'REAL': 3,
+      'MEGA_REAL': 4,
+      'ULTRA_REAL': 5,
+      'LEGENDARIA': 7,
+      'PROMO': 6,
+      'SECRETA': 8
+    }
+
+    // Crear un mapa de cartas por nombre (normalizado), seleccionando la versión con menor rareza
     const cardsMap = new Map<string, any>()
     
     if (cards) {
       cards.forEach(card => {
         const normalizedName = card.name.toLowerCase().trim()
-        // Si ya existe una carta con este nombre, mantener la que tenga mejor coincidencia
-        if (!cardsMap.has(normalizedName)) {
+        const existingCard = cardsMap.get(normalizedName)
+        
+        if (!existingCard) {
+          // Si no existe, agregar esta carta
           cardsMap.set(normalizedName, card)
+        } else {
+          // Si ya existe, comparar rarezas y mantener la de menor rareza
+          const existingRarityOrder = rarityOrder[existingCard.rarity] || 999
+          const currentRarityOrder = rarityOrder[card.rarity] || 999
+          
+          if (currentRarityOrder < existingRarityOrder) {
+            // Esta carta tiene menor rareza, reemplazar
+            cardsMap.set(normalizedName, card)
+          }
         }
       })
     }

@@ -54,7 +54,6 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
     { cardName: 'Kogarasumaru', status: 'banned', maxCopies: 0 },
     
     // Limitadas a 1 copia
-    { cardName: 'Moo', status: 'limited-1', maxCopies: 1 },
     { cardName: 'París', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Onsen', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Oda Nobunaga', status: 'limited-1', maxCopies: 1 },
