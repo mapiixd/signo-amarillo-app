@@ -47,6 +47,15 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
   const [expansions, setExpansions] = useState<string[]>([])
   const [expansionsLoading, setExpansionsLoading] = useState(true)
   const [card, setCard] = useState<SupabaseCard | null>(null)
+  const [banlistData, setBanlistData] = useState<Record<string, { status: string; max_copies: number }>>({
+    'Imperio Racial': { status: '', max_copies: 3 },
+    'VCR': { status: '', max_copies: 3 },
+    'Triadas': { status: '', max_copies: 3 }
+  })
+  const [rotationData, setRotationData] = useState<{ format: string; expansion: string }>({
+    format: 'Imperio Racial',
+    expansion: ''
+  })
   const [formData, setFormData] = useState<CardFormData>({
     name: '',
     type: 'ALIADO',
@@ -65,6 +74,13 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
     fetchExpansions()
     fetchCard()
   }, [id])
+
+  useEffect(() => {
+    if (card) {
+      fetchBanlistData()
+      fetchRotationData()
+    }
+  }, [card])
 
   const fetchExpansions = async () => {
     try {
@@ -127,6 +143,56 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
     }
   }
 
+  const fetchBanlistData = async () => {
+    if (!card) return
+    try {
+      const response = await fetch('/api/admin/banlist')
+      if (response.ok) {
+        const data = await response.json()
+        const entries = data.entries || []
+        const banlistMap: Record<string, { status: string; max_copies: number }> = {
+          'Imperio Racial': { status: '', max_copies: 3 },
+          'VCR': { status: '', max_copies: 3 },
+          'Triadas': { status: '', max_copies: 3 }
+        }
+        
+        entries.forEach((entry: any) => {
+          if (entry.card_name === card.name) {
+            banlistMap[entry.format] = {
+              status: entry.status,
+              max_copies: entry.max_copies
+            }
+          }
+        })
+        
+        setBanlistData(banlistMap)
+      }
+    } catch (error) {
+      console.error('Error fetching banlist data:', error)
+    }
+  }
+
+  const fetchRotationData = async () => {
+    if (!card) return
+    try {
+      const response = await fetch('/api/admin/rotation?format=Imperio Racial')
+      if (response.ok) {
+        const data = await response.json()
+        const entries = data.entries || []
+        const rotationEntry = entries.find((entry: any) => entry.card_name === card.name)
+        
+        if (rotationEntry) {
+          setRotationData({
+            format: rotationEntry.format,
+            expansion: rotationEntry.rotation_expansion || ''
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching rotation data:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -152,6 +218,7 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
           : null
       }
 
+      // Guardar la carta
       const response = await fetch(`/api/admin/cards/${id}`, {
         method: 'PUT',
         headers: {
@@ -160,32 +227,81 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
         body: JSON.stringify(dataToSend)
       })
 
-      if (response.ok) {
-        await Swal.fire({
-          ...swalConfig,
-          icon: 'success',
-          title: '¡Éxito!',
-          text: 'Carta actualizada exitosamente',
-          timer: 2000,
-          showConfirmButton: false
-        })
-        router.push('/admin/cards')
-      } else {
+      if (!response.ok) {
         const error = await response.json()
-        await Swal.fire({
-          ...swalConfig,
-          icon: 'error',
-          title: 'Error',
-          text: error.error || 'No se pudo actualizar la carta'
+        throw new Error(error.error || 'No se pudo actualizar la carta')
+      }
+
+      // Guardar banlist para cada formato
+      const banlistResponse = await fetch('/api/admin/banlist')
+      const banlistDataResponse = banlistResponse.ok ? await banlistResponse.json() : { entries: [] }
+      const existingBanlistEntries = banlistDataResponse.entries.filter((entry: any) => entry.card_name === formData.name)
+
+      for (const [format, banlist] of Object.entries(banlistData)) {
+        const existingEntry = existingBanlistEntries.find((entry: any) => entry.format === format)
+        
+        if (banlist.status && banlist.status !== '') {
+          // Crear o actualizar banlist
+          await fetch('/api/admin/banlist', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              card_name: formData.name,
+              format,
+              status: banlist.status,
+              max_copies: banlist.max_copies
+            })
+          })
+        } else if (existingEntry) {
+          // Si había una entrada pero ahora está vacía, eliminar
+          await fetch(`/api/admin/banlist?card_name=${encodeURIComponent(formData.name)}&format=${encodeURIComponent(format)}`, {
+            method: 'DELETE'
+          })
+        }
+      }
+
+      // Guardar rotación
+      const rotationResponse = await fetch('/api/admin/rotation?format=Imperio Racial')
+      const rotationDataResponse = rotationResponse.ok ? await rotationResponse.json() : { entries: [] }
+      const existingRotationEntry = rotationDataResponse.entries.find((entry: any) => entry.card_name === formData.name)
+
+      if (rotationData.expansion) {
+        await fetch('/api/admin/rotation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            card_name: formData.name,
+            format: rotationData.format,
+            rotation_expansion: rotationData.expansion
+          })
+        })
+      } else if (existingRotationEntry) {
+        // Eliminar rotación si estaba configurada pero ahora está vacía
+        await fetch(`/api/admin/rotation?card_name=${encodeURIComponent(formData.name)}&format=${encodeURIComponent(rotationData.format)}`, {
+          method: 'DELETE'
         })
       }
-    } catch (error) {
+
+      await Swal.fire({
+        ...swalConfig,
+        icon: 'success',
+        title: '¡Éxito!',
+        text: 'Carta actualizada exitosamente',
+        timer: 2000,
+        showConfirmButton: false
+      })
+      router.push('/admin/cards')
+    } catch (error: any) {
       console.error('Error updating card:', error)
       await Swal.fire({
         ...swalConfig,
         icon: 'error',
         title: 'Error',
-        text: 'Error al actualizar la carta'
+        text: error.message || 'Error al actualizar la carta'
       })
     } finally {
       setSaving(false)
@@ -538,6 +654,80 @@ export default function EditCardPage({ params }: { params: Promise<{ id: string 
                         Carta completada (lista para usar)
                       </span>
                     </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección de Banlist */}
+              <div className="border-t border-[#2D9B96] pt-6">
+                <h3 className="text-lg font-semibold text-[#F4C430] mb-4">Banlist</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {(['Imperio Racial', 'VCR', 'Triadas'] as const).map((format) => (
+                    <div key={format} className="space-y-3">
+                      <label className="block text-sm font-semibold text-[#F4C430]">
+                        {format}
+                      </label>
+                      <select
+                        value={banlistData[format].status || ''}
+                        onChange={(e) => {
+                          const status = e.target.value
+                          const maxCopies = status === 'banned' ? 0 : status === 'limited-1' ? 1 : status === 'limited-2' ? 2 : status === 'allowed' ? 3 : 3
+                          setBanlistData(prev => ({
+                            ...prev,
+                            [format]: { status, max_copies: maxCopies }
+                          }))
+                        }}
+                        className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                      >
+                        <option value="">Sin restricción</option>
+                        <option value="allowed">Permitida (3 copias)</option>
+                        <option value="limited-2">Limitada a 2 copias</option>
+                        <option value="limited-1">Limitada a 1 copia</option>
+                        <option value="banned">Prohibida (0 copias)</option>
+                      </select>
+                      {banlistData[format].status && (
+                        <p className="text-xs text-[#4ECDC4]">
+                          Máximo: {banlistData[format].max_copies} copia{banlistData[format].max_copies !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sección de Rotación */}
+              <div className="border-t border-[#2D9B96] pt-6">
+                <h3 className="text-lg font-semibold text-[#F4C430] mb-4">Rotación</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                      Formato
+                    </label>
+                    <select
+                      value={rotationData.format}
+                      onChange={(e) => setRotationData(prev => ({ ...prev, format: e.target.value }))}
+                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                    >
+                      <option value="Imperio Racial">Imperio Racial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                      Expansión de Rotación
+                    </label>
+                    <select
+                      value={rotationData.expansion}
+                      onChange={(e) => setRotationData(prev => ({ ...prev, expansion: e.target.value }))}
+                      className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                      disabled={expansionsLoading}
+                    >
+                      <option value="">
+                        {expansionsLoading ? 'Cargando...' : 'Sin rotación'}
+                      </option>
+                      {expansions.map((expansion) => (
+                        <option key={expansion} value={expansion}>{expansion}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
