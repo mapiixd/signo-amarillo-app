@@ -253,16 +253,19 @@ export default function DeckViewPage() {
       
       // Mover el contenedor fuera de la pantalla pero mantenerlo accesible para html2canvas
       // Usamos posición fuera de la pantalla pero sin ocultarlo completamente para que html2canvas pueda capturarlo
+      // Ancho estándar para exportación consistente en todos los dispositivos
+      const exportWidth = 1000 // Ancho estándar para exportación
       deckViewRef.current.style.position = 'absolute'
       deckViewRef.current.style.top = '0'
       deckViewRef.current.style.left = '-9999px'
-      deckViewRef.current.style.width = '1200px' // Reducir ancho para menor tamaño
-      deckViewRef.current.style.maxWidth = '95vw'
+      deckViewRef.current.style.width = `${exportWidth}px`
+      deckViewRef.current.style.maxWidth = `${exportWidth}px`
+      deckViewRef.current.style.minWidth = `${exportWidth}px`
       deckViewRef.current.style.visibility = 'visible' // Necesario para html2canvas
       deckViewRef.current.style.opacity = '1' // Necesario para html2canvas
       deckViewRef.current.style.pointerEvents = 'none' // Evitar interacciones
       deckViewRef.current.style.background = '#0A0E1A'
-      deckViewRef.current.style.padding = '24px'
+      deckViewRef.current.style.padding = '32px'
       deckViewRef.current.style.zIndex = '-9999' // Asegurar que esté detrás de todo
       
       // Esperar un momento para que el contenedor se renderice completamente
@@ -290,11 +293,13 @@ export default function DeckViewPage() {
       // Capturar el elemento como canvas con manejo de errores CSS
       const canvas = await html2canvas(deckViewRef.current, {
         backgroundColor: '#0A0E1A',
-        scale: 1, // Reducir escala para menor tamaño de archivo (era 2)
+        scale: 2, // Escala 2 para mejor calidad en todos los dispositivos
         logging: false,
         useCORS: true,
         allowTaint: true,
         foreignObjectRendering: false, // Deshabilitar para evitar problemas con CSS moderno
+        width: 1000, // Ancho fijo para consistencia
+        height: deckViewRef.current.scrollHeight, // Altura automática basada en contenido
         onclone: (clonedDoc, element) => {
           try {
             // Ocultar botones de acción durante la exportación
@@ -584,12 +589,15 @@ export default function DeckViewPage() {
         {/* Contenedor para exportación que incluye header y cartas - oculto visualmente pero accesible para html2canvas */}
         <div 
           ref={deckViewRef} 
-          className="bg-[#0A0E1A] p-6 rounded-xl w-full max-w-7xl" 
+          className="bg-[#0A0E1A] p-6 rounded-xl" 
           style={{ 
             visibility: 'hidden', 
             position: 'absolute', 
             left: '-9999px',
-            top: '0'
+            top: '0',
+            width: '1000px',
+            maxWidth: '1000px',
+            minWidth: '1000px'
           }}
         >
           {/* Header simple con solo texto para exportación */}
@@ -611,8 +619,8 @@ export default function DeckViewPage() {
             </div>
           </div>
 
-          {/* Grid de Cartas para exportación */}
-          <div className="grid grid-cols-5 gap-4">
+          {/* Grid de Cartas para exportación - Layout estándar consistente */}
+          <div className="grid grid-cols-5 gap-4" style={{ width: '100%' }}>
           {cardsToDisplay.map((entry) => {
             // Verificar que la carta existe
             if (!entry.card) {
@@ -645,6 +653,7 @@ export default function DeckViewPage() {
                         src={imageUrl || ''}
                         alt={entry.card.name}
                         className="w-full h-auto object-cover"
+                        style={{ display: 'block', width: '100%', height: 'auto', maxWidth: '100%' }}
                         loading="lazy"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'

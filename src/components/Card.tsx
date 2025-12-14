@@ -39,8 +39,8 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
   const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
 
   const cardContent = (
-    <div className={`bg-[#121825] rounded-lg shadow-lg p-4 border border-[#2D9B96] transition-all ${clickable ? 'hover:shadow-2xl hover:scale-105 cursor-pointer hover-glow' : 'hover:shadow-xl'}`}>
-      <div className="aspect-[3/4] bg-[#1A2332] rounded mb-3 flex items-center justify-center overflow-hidden border border-[#1A7F7A]">
+    <div className={`bg-[#121825] rounded-lg shadow-lg p-4 border border-[#2D9B96] transition-all h-full flex flex-col ${clickable ? 'hover:shadow-2xl hover:scale-105 cursor-pointer hover-glow' : 'hover:shadow-xl'}`}>
+      <div className="aspect-[3/4] bg-[#1A2332] rounded mb-3 flex items-center justify-center overflow-hidden border border-[#1A7F7A] flex-shrink-0">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -55,10 +55,10 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
         )}
       </div>
 
-      <div className="space-y-2">
-        <h3 className="font-bold text-lg text-[#F4C430]">{card.name}</h3>
+      <div className="flex flex-col flex-grow space-y-2">
+        <h3 className="font-bold text-lg text-[#F4C430] line-clamp-2 min-h-[3.5rem]">{card.name}</h3>
 
-        <div className="flex justify-between items-center text-sm">
+        <div className="flex justify-between items-center text-sm flex-shrink-0">
           <span className={`px-2 py-1 rounded capitalize ${getTypeColor(card.type)}`}>
             {CARD_TYPE_LABELS[card.type]}
           </span>
@@ -67,57 +67,56 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
           </span>
         </div>
 
-        <div className="flex justify-between items-center">
-          {card.cost !== null && card.type !== 'ORO' && (
-            <span className="text-[#4ECDC4]">
-              Costo: <span className="font-semibold text-[#F4C430]">{card.cost}</span>
-            </span>
-          )}
-          {card.type === 'ORO' && (
-            <span className="text-[#F4C430] font-semibold">ORO</span>
-          )}
-          {showQuantity && quantity && (
-            <span className="text-[#4ECDC4]">
-              Cantidad: <span className="font-semibold text-[#F4C430]">{quantity}</span>
-            </span>
-          )}
-        </div>
-
-        {(card.attack !== null || card.defense !== null) && card.type === 'ALIADO' && (
-          <div className="flex justify-between text-sm">
-            {card.attack !== null && (
+        <div className="flex justify-between items-center min-h-[1.5rem] flex-shrink-0 text-sm flex-wrap gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            {card.type === 'ALIADO' && card.attack !== null && (
               <span className="text-[#E74860] font-semibold">
                 ⚔️ {card.attack}
               </span>
             )}
-            {card.defense !== null && (
+            {card.cost !== null && card.type !== 'ORO' && (
+              <span className="text-[#4ECDC4]">
+                💰 <span className="font-semibold text-[#F4C430]">{card.cost}</span>
+              </span>
+            )}
+            {card.type === 'ALIADO' && card.race && (
+              <span className="text-[#4ECDC4]">
+                Raza: <span className="font-semibold text-[#F4C430]">{card.race}</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {card.type === 'ALIADO' && card.defense !== null && (
               <span className="text-[#4ECDC4] font-semibold">
                 🛡️ {card.defense}
               </span>
             )}
+            {showQuantity && quantity && (
+              <span className="text-[#4ECDC4]">
+                Cantidad: <span className="font-semibold text-[#F4C430]">{quantity}</span>
+              </span>
+            )}
           </div>
-        )}
-
-        {card.description && (
-          <p className="text-[#A0A0A0] text-sm mt-2">{card.description}</p>
-        )}
-
-        <div className="text-xs text-[#2D9B96] mt-2">
-          {card.expansion}
         </div>
 
-        {!card.is_active && (
-          <div className="text-xs text-[#F4C430] font-medium mt-1">
-            ⚠️ Pendiente de completar
+        <div className="mt-auto pt-2">
+          <div className="text-xs text-[#2D9B96]">
+            {card.expansion}
           </div>
-        )}
+
+          {!card.is_active && (
+            <div className="text-xs text-[#F4C430] font-medium mt-1">
+              ⚠️ Pendiente de completar
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 
   if (clickable) {
     return (
-      <Link href={`/cards/${encodeURIComponent(card.name)}`}>
+      <Link href={`/cards/${encodeURIComponent(card.name)}`} className="h-full flex">
         {cardContent}
       </Link>
     )

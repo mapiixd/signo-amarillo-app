@@ -337,7 +337,7 @@ export default function CardsPage() {
           </div>
         ) : displayedCards.length > 0 ? (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6 items-stretch">
               {displayedCards.map((card) => (
                 <Card key={card.id} card={card} />
               ))}

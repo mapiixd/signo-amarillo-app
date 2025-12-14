@@ -191,7 +191,7 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
               {card.description && (
                 <div className="mt-6 pt-6 border-t border-[#2D9B96]">
                   <label className="block text-sm font-semibold text-[#4ECDC4] mb-2">Habilidad</label>
-                  <p className="text-[#A0A0A0] leading-relaxed">{card.description}</p>
+                  <p className="text-white leading-relaxed">{card.description}</p>
                 </div>
               )}
             </div>

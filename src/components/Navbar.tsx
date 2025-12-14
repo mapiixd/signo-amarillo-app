@@ -103,7 +103,7 @@ export default function Navbar() {
               <img 
                 src="/Logo esquina.png" 
                 alt="El Signo Amarillo" 
-                className="h-14 md:h-16 relative z-10 drop-shadow-[0_0_8px_rgba(244,196,48,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(244,196,48,0.7)] transition-all object-contain"
+                className="h-8 md:h-10 relative z-10 drop-shadow-[0_0_8px_rgba(244,196,48,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(244,196,48,0.7)] transition-all object-contain"
               />
             </div>
           </Link>

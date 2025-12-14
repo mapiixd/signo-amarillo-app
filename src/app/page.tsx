@@ -27,7 +27,7 @@ export default function Home() {
               <img 
                 src="/Logo esquina.png" 
                 alt="El Signo Amarillo" 
-                className="h-24 sm:h-32 md:h-40 lg:h-48 xl:h-56 object-contain drop-shadow-[0_0_8px_rgba(244,196,48,0.5)]"
+                className="h-16 sm:h-20 md:h-24 lg:h-28 xl:h-32 object-contain drop-shadow-[0_0_8px_rgba(244,196,48,0.5)]"
               />
             </div>
             <p className="text-sm sm:text-base md:text-lg text-[#4ECDC4] max-w-2xl mx-auto px-4">
