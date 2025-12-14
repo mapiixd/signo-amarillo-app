@@ -49,6 +49,28 @@ export default function CardsPage() {
   ]
 
   useEffect(() => {
+    // Restaurar estado de búsqueda desde sessionStorage
+    const savedState = sessionStorage.getItem('cardsPageState')
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState)
+        // Restaurar todos los estados
+        setSearch(state.search || '')
+        setTypeFilter(state.typeFilter || '')
+        setExpansionFilter(state.expansionFilter || '')
+        setCostFilter(state.costFilter || '')
+        setAttackFilter(state.attackFilter || '')
+        setRaceFilter(state.raceFilter || '')
+        setAbilityText(state.abilityText || '')
+        setShowAdvancedFilters(state.showAdvancedFilters || false)
+        setPage(state.page || 1)
+        // No eliminar el estado aquí, se eliminará después de restaurar
+        // para permitir múltiples navegaciones
+      } catch (error) {
+        console.error('Error restoring cards page state:', error)
+        sessionStorage.removeItem('cardsPageState')
+      }
+    }
     fetchExpansions()
     fetchAllTypes()
   }, [])
@@ -61,7 +83,61 @@ export default function CardsPage() {
     setAbilityText('')
   }, [typeFilter])
 
+  // Función para guardar el estado actual
+  const saveState = useCallback(() => {
+    const state = {
+      search,
+      typeFilter,
+      expansionFilter,
+      costFilter,
+      attackFilter,
+      raceFilter,
+      abilityText,
+      showAdvancedFilters,
+      page
+    }
+    sessionStorage.setItem('cardsPageState', JSON.stringify(state))
+  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, abilityText, showAdvancedFilters, page])
+
+  // Guardar estado cuando cambian los filtros
   useEffect(() => {
+    saveState()
+  }, [saveState])
+
+  // Guardar estado antes de navegar (usando beforeunload, visibilitychange y evento personalizado)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveState()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        saveState()
+      }
+    }
+
+    // Escuchar evento personalizado desde el componente Card
+    const handleSaveState = () => {
+      saveState()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('saveCardsPageState', handleSaveState)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('saveCardsPageState', handleSaveState)
+    }
+  }, [saveState])
+
+  useEffect(() => {
+    // Limpiar el estado guardado después de la primera carga con filtros restaurados
+    const savedState = sessionStorage.getItem('cardsPageState')
+    if (savedState) {
+      sessionStorage.removeItem('cardsPageState')
+    }
     fetchCards()
   }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, abilityText])
 

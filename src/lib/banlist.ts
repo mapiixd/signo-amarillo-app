@@ -33,7 +33,7 @@ export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
     { cardName: 'Anillo de Tierra', status: 'limited-1', maxCopies: 1 },
     { cardName: 'El Rey y el Verdugo', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Shakar Raj', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Paladín', status: 'limited-1', maxCopies: 1 },
+    { cardName: 'Paladín Bestiarium', status: 'limited-1', maxCopies: 1 },
     { cardName: 'El Mago', status: 'limited-1', maxCopies: 1 },
     { cardName: 'Cancha Rayada', status: 'limited-1', maxCopies: 1 },
     
@@ -82,10 +82,10 @@ export function getCardBanStatus(cardName: string, format: FormatType): BanlistE
   const banlist = BANLISTS[format]
   if (!banlist) return null
   
-  // Buscar coincidencia exacta o parcial (ignorando mayúsculas/minúsculas)
+  // Buscar coincidencia exacta (ignorando mayúsculas/minúsculas y espacios al inicio/final)
+  const normalizedCardName = cardName.trim().toLowerCase()
   return banlist.find(entry => 
-    entry.cardName.toLowerCase() === cardName.toLowerCase() ||
-    cardName.toLowerCase().includes(entry.cardName.toLowerCase())
+    entry.cardName.trim().toLowerCase() === normalizedCardName
   ) || null
 }
 

@@ -36,6 +36,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
   const [selectedCards, setSelectedCards] = useState<SelectedCard[]>([])
   const [sideboard, setSideboard] = useState<SelectedCard[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [abilityFilter, setAbilityFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('Todas')
   const [expansionFilter, setExpansionFilter] = useState<string>('Todas')
   const [deckRace, setDeckRace] = useState<string>('')
@@ -699,6 +700,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
   const filteredCards = cards
     .filter(card => {
       const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesAbility = !abilityFilter || (card.description?.toLowerCase().includes(abilityFilter.toLowerCase()) ?? false)
       const matchesType = typeFilter === 'Todas' || card.type === typeFilter
       const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
       
@@ -718,7 +720,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
       }
       // Si no es aliado (Arma, Talismán, Tótem, Oro), siempre se muestra
       
-      return matchesSearch && matchesType && matchesExpansion && matchesRace
+      return matchesSearch && matchesAbility && matchesType && matchesExpansion && matchesRace
     })
     .sort((a, b) => {
       // Ordenar por coste (ascendente)
@@ -783,17 +785,17 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
         <div className="mb-6">
           <button
             onClick={() => router.back()}
-            className="text-[#2D9B96] hover:text-[#4ECDC4] mb-4 flex items-center gap-2"
+            className="text-[#2D9B96] hover:text-[#4ECDC4] mb-4 flex items-center gap-2 text-sm sm:text-base"
           >
             ← Volver
           </button>
-          <h1 className="text-3xl font-bold text-[#F4C430] mb-2">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#F4C430] mb-2">
             Editar Baraja - Raza: {deckRace}
           </h1>
-          <p className="text-[#2D9B96] text-sm mb-1">
+          <p className="text-[#2D9B96] text-xs sm:text-sm mb-1">
             Formato: Imperio Racial | Solo se mostrarán aliados de raza {deckRace} o sin raza
           </p>
-          <p className="text-[#F4C430] text-xs italic">
+          <p className="text-[#F4C430] text-[10px] sm:text-xs italic">
             📋 Rotación activa: Espíritu Samurai - KvsM : Titanes
           </p>
         </div>
@@ -810,6 +812,17 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 py-3 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg text-white focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] placeholder-[#707070]"
                   placeholder="🔍 Buscar carta por nombre..."
+                />
+              </div>
+
+              {/* Filtro por habilidad */}
+              <div className="relative mb-4">
+                <input
+                  type="text"
+                  value={abilityFilter}
+                  onChange={(e) => setAbilityFilter(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg text-white focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] placeholder-[#707070]"
+                  placeholder="✨ Buscar por habilidad..."
                 />
               </div>
 
@@ -979,7 +992,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
           </div>
 
           {/* Panel Derecho - Mazo Actual */}
-          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-3 sm:p-6 lg:sticky lg:top-4 max-h-[calc(100vh-50px)]">
+          <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-3 sm:p-6 lg:sticky lg:top-4 max-h-[calc(100vh-50px)] overflow-hidden flex flex-col">
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
               {/* Input nombre del mazo */}
               <div className="mb-4">
@@ -987,7 +1000,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg text-white font-semibold text-lg focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] placeholder-[#707070]"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg text-white font-semibold text-base sm:text-lg focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] placeholder-[#707070]"
                   placeholder="Mi Nuevo Mazo"
                   required
                 />
@@ -998,7 +1011,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                 <button
                   type="button"
                   onClick={() => setActiveTab('main')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${
+                  className={`flex-1 px-2 sm:px-4 py-2 rounded-lg font-semibold transition-all text-xs sm:text-base ${
                     activeTab === 'main'
                       ? 'bg-[#2D9B96] text-white'
                       : 'bg-[#1A2332] text-[#A0A0A0] hover:bg-[#0A0E1A]'
@@ -1009,7 +1022,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                 <button
                   type="button"
                   onClick={() => setActiveTab('sidedeck')}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${
+                  className={`flex-1 px-2 sm:px-4 py-2 rounded-lg font-semibold transition-all text-xs sm:text-base ${
                     activeTab === 'sidedeck'
                       ? 'bg-[#2D9B96] text-white'
                       : 'bg-[#1A2332] text-[#A0A0A0] hover:bg-[#0A0E1A]'
@@ -1021,22 +1034,22 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
               {/* Estadísticas del mazo principal */}
               {activeTab === 'main' && (
-                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-3 mb-3">
-                  <h3 className="text-[#F4C430] font-bold text-lg mb-2 text-center">
+                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-2 sm:p-3 mb-3">
+                  <h3 className="text-[#F4C430] font-bold text-base sm:text-lg mb-2 text-center">
                     Total: {totalCards} / 50
                   </h3>
                   
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between text-[#E8E8E8]">
+                  <div className="space-y-1 text-[10px] sm:text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[#E8E8E8]">
                       <span>🗡️ Aliados: <span className="text-[#2D9B96]">{allyCount}</span></span>
                       <span>⚔️ Armas: <span className="text-[#2D9B96]">{weaponCount}</span></span>
                       <span>💰 Oros: <span className="text-[#F4C430]">{goldCount}</span></span>
                     </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8]">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[#E8E8E8]">
                       <span>✨ Talismanes: <span className="text-[#2D9B96]">{talismanCount}</span></span>
                       <span>🗿 Tótems: <span className="text-[#2D9B96]">{totemCount}</span></span>
                     </div>
-                    <div className="flex items-center justify-between text-[#E8E8E8] pt-1 border-t border-[#2D9B96] mt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[#E8E8E8] pt-1 border-t border-[#2D9B96] mt-1">
                       <span>A+A+T: <span className={allyWeaponTotemCount >= 17 ? 'text-[#2D9B96]' : 'text-[#E74860]'}>{allyWeaponTotemCount}</span> <span className="text-[#A0A0A0] text-[10px]">(≥17)</span></span>
                       <span>Sin raza: <span className={alliesWithoutRace <= 4 ? 'text-[#2D9B96]' : 'text-[#E74860]'}>{alliesWithoutRace}</span> <span className="text-[#A0A0A0] text-[10px]">(≤4)</span></span>
                       <span>Costo: <span className="text-[#F4C430]">{avgCost}</span></span>
@@ -1047,11 +1060,11 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
               {/* Estadísticas del sidedeck */}
               {activeTab === 'sidedeck' && (
-                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-3 mb-3">
-                  <h3 className="text-[#F4C430] font-bold text-lg mb-1 text-center">
+                <div className="bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg p-2 sm:p-3 mb-3">
+                  <h3 className="text-[#F4C430] font-bold text-base sm:text-lg mb-1 text-center">
                     Total: {totalSideboard} / 15
                   </h3>
-                  <p className="text-[#A0A0A0] text-xs text-center">
+                  <p className="text-[#A0A0A0] text-[10px] sm:text-xs text-center">
                     Opcional - Debe tener exactamente 15 cartas
                   </p>
                 </div>
@@ -1071,10 +1084,10 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                       return (
                         <div
                           key={sc.card.id}
-                          className="bg-[#1A2332] border border-[#2D9B96] rounded-lg p-2 flex items-center gap-3"
+                          className="bg-[#1A2332] border border-[#2D9B96] rounded-lg p-2 flex items-center gap-2 sm:gap-3"
                         >
                           {/* Miniatura de la carta */}
-                          <div className="w-12 h-16 bg-[#0A0E1A] rounded overflow-hidden flex-shrink-0">
+                          <div className="w-10 h-14 sm:w-12 sm:h-16 bg-[#0A0E1A] rounded overflow-hidden flex-shrink-0">
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
@@ -1091,21 +1104,21 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
                           {/* Info de la carta */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-medium truncate">
+                            <p className="text-white text-xs sm:text-sm font-medium truncate">
                               {sc.card.name}
                             </p>
-                            <p className="text-[#A0A0A0] text-xs">
+                            <p className="text-[#A0A0A0] text-[10px] sm:text-xs">
                               {CARD_TYPE_LABELS[sc.card.type as keyof typeof CARD_TYPE_LABELS]}
                               {sc.card.race && ` - ${sc.card.race}`}
                             </p>
                           </div>
 
                           {/* Controles */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                             <button
                               type="button"
                               onClick={() => setSelectedCardForView(sc.card)}
-                              className="text-[#2D9B96] hover:text-[#4ECDC4] text-sm"
+                              className="text-[#2D9B96] hover:text-[#4ECDC4] text-xs sm:text-sm"
                               title="Ver carta"
                             >
                               👁️
@@ -1113,17 +1126,17 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                             <button
                               type="button"
                               onClick={() => handleRemoveCard(sc.card.id, isSideboard)}
-                              className="text-[#E74860] hover:text-[#FF6B7A] font-bold text-lg w-6 h-6 flex items-center justify-center rounded hover:bg-[#0A0E1A]"
+                              className="text-[#E74860] hover:text-[#FF6B7A] font-bold text-base sm:text-lg w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded hover:bg-[#0A0E1A]"
                             >
                               −
                             </button>
-                            <span className="text-[#F4C430] font-bold text-lg min-w-[2ch] text-center">
+                            <span className="text-[#F4C430] font-bold text-base sm:text-lg min-w-[2ch] text-center">
                               {sc.quantity}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleAddCard(sc.card, isSideboard)}
-                              className="text-[#2D9B96] hover:text-[#4ECDC4] font-bold text-lg w-6 h-6 flex items-center justify-center rounded hover:bg-[#0A0E1A]"
+                              className="text-[#2D9B96] hover:text-[#4ECDC4] font-bold text-base sm:text-lg w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded hover:bg-[#0A0E1A]"
                             >
                               +
                             </button>
@@ -1136,7 +1149,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                                   setSelectedCards(selectedCards.filter(c => c.card.id !== sc.card.id))
                                 }
                               }}
-                              className="text-[#E74860] hover:text-[#FF6B7A] ml-1"
+                              className="text-[#E74860] hover:text-[#FF6B7A] text-xs sm:text-sm"
                               title="Eliminar"
                             >
                               🗑️
@@ -1159,16 +1172,16 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
               {/* Toggle privado */}
               <div className="mb-4">
-                <label className="flex items-center gap-3 cursor-pointer bg-[#1A2332] border border-[#2D9B96] rounded-lg p-3">
+                <label className="flex items-center gap-2 sm:gap-3 cursor-pointer bg-[#1A2332] border border-[#2D9B96] rounded-lg p-2 sm:p-3">
                   <input
                     type="checkbox"
                     checked={!isPublic}
                     onChange={(e) => setIsPublic(!e.target.checked)}
-                    className="w-5 h-5 accent-[#2D9B96]"
+                    className="w-4 h-4 sm:w-5 sm:h-5 accent-[#2D9B96] flex-shrink-0"
                   />
-                  <div className="flex-1">
-                    <span className="text-[#E8E8E8] font-semibold">Hacer este mazo privado</span>
-                    <p className="text-xs text-[#A0A0A0] mt-1">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[#E8E8E8] font-semibold text-xs sm:text-sm">Hacer este mazo privado</span>
+                    <p className="text-[10px] sm:text-xs text-[#A0A0A0] mt-1">
                       {isPublic ? '🌍 Tu mazo será visible públicamente' : '🔒 Solo tú podrás ver este mazo'}
                     </p>
                   </div>
@@ -1176,11 +1189,11 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
               </div>
 
               {/* Botones de acción */}
-              <div className="space-y-2">
+              <div className="space-y-2 mt-auto">
                 <button
                   type="submit"
                   disabled={saving || totalCards !== 50}
-                  className="w-full px-6 py-3 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 sm:px-6 py-2 sm:py-3 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-all font-semibold text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                   title={totalCards !== 50 ? 'El mazo principal debe tener exactamente 50 cartas' : ''}
                 >
                   {saving ? 'Guardando...' : 'Actualizar Mazo'}
@@ -1188,7 +1201,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="w-full px-6 py-3 bg-[#0A0E1A] text-white rounded-lg hover:bg-[#1A2332] transition-all font-semibold border border-[#2D9B96]"
+                  className="w-full px-4 sm:px-6 py-2 sm:py-3 bg-[#0A0E1A] text-white rounded-lg hover:bg-[#1A2332] transition-all font-semibold text-sm sm:text-base border border-[#2D9B96]"
                 >
                   Cancelar
                 </button>
@@ -1209,13 +1222,13 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del modal */}
-            <div className="sticky top-0 bg-[#121825] border-b border-[#2D9B96] p-4 flex justify-between items-center z-10">
-              <h2 className="text-xl sm:text-2xl font-bold text-[#F4C430]">
+            <div className="sticky top-0 bg-[#121825] border-b border-[#2D9B96] p-3 sm:p-4 flex justify-between items-center gap-2 z-10">
+              <h2 className="text-base sm:text-xl lg:text-2xl font-bold text-[#F4C430] truncate flex-1 min-w-0">
                 {selectedCardForView.name}
               </h2>
               <button
                 onClick={() => setSelectedCardForView(null)}
-                className="text-[#4ECDC4] hover:text-[#F4C430] text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#1A2332] transition-colors"
+                className="text-[#4ECDC4] hover:text-[#F4C430] text-xl sm:text-2xl font-bold w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg hover:bg-[#1A2332] transition-colors flex-shrink-0"
               >
                 ×
               </button>

@@ -115,8 +115,19 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
   )
 
   if (clickable) {
+    const handleClick = () => {
+      // Disparar evento personalizado para que la página de cartas guarde el estado
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('saveCardsPageState'))
+      }
+    }
+
     return (
-      <Link href={`/cards/${encodeURIComponent(card.name)}`} className="h-full flex">
+      <Link 
+        href={`/cards/${encodeURIComponent(card.name)}`} 
+        className="h-full flex"
+        onClick={handleClick}
+      >
         {cardContent}
       </Link>
     )

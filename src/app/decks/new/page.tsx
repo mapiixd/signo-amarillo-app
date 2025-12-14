@@ -35,6 +35,7 @@ function NewDeckPageContent() {
   const [selectedCards, setSelectedCards] = useState<SelectedCard[]>([])
   const [sideboard, setSideboard] = useState<SelectedCard[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [abilityFilter, setAbilityFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('Todas')
   const [expansionFilter, setExpansionFilter] = useState<string>('Todas')
   const [deckRace, setDeckRace] = useState<string>(raceParam || '')
@@ -594,6 +595,7 @@ function NewDeckPageContent() {
   const filteredCards = cards
     .filter(card => {
       const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesAbility = !abilityFilter || (card.description?.toLowerCase().includes(abilityFilter.toLowerCase()) ?? false)
       const matchesType = typeFilter === 'Todas' || card.type === typeFilter
       const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
       
@@ -613,7 +615,7 @@ function NewDeckPageContent() {
       }
       // Si no es aliado (Arma, Talismán, Tótem, Oro), siempre se muestra
       
-      return matchesSearch && matchesType && matchesExpansion && matchesRace
+      return matchesSearch && matchesAbility && matchesType && matchesExpansion && matchesRace
     })
     .sort((a, b) => {
       // Ordenar por coste (ascendente)
@@ -705,6 +707,17 @@ function NewDeckPageContent() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 py-3 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg text-white focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] placeholder-[#707070]"
                   placeholder="🔍 Buscar carta por nombre..."
+                />
+              </div>
+
+              {/* Filtro por habilidad */}
+              <div className="relative mb-4">
+                <input
+                  type="text"
+                  value={abilityFilter}
+                  onChange={(e) => setAbilityFilter(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg text-white focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] placeholder-[#707070]"
+                  placeholder="✨ Buscar por habilidad..."
                 />
               </div>
 
