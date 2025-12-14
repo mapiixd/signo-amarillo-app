@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Swal from 'sweetalert2'
 import { Card as CardType, CARD_TYPE_LABELS, DeckWithCards } from '@/types'
@@ -49,6 +49,235 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
   const sidedeckScrollRef = useRef<HTMLDivElement>(null)
   const prevMainDeckLengthRef = useRef<number>(0)
   const prevSideboardLengthRef = useRef<number>(0)
+  const modalHistoryPushedRef = useRef<boolean>(false)
+  const initialDeckStateRef = useRef<{name: string, selectedCards: SelectedCard[], sideboard: SelectedCard[], isPublic: boolean} | null>(null)
+
+  // Funciones para guardar y cargar el progreso
+  const getStorageKey = useCallback(() => {
+    return resolvedParams?.id ? `deck-edit-draft-${resolvedParams.id}` : null
+  }, [resolvedParams?.id])
+
+  const saveProgress = useCallback(() => {
+    const storageKey = getStorageKey()
+    if (!storageKey) return
+
+    // Solo guardar si hay cambios desde el estado inicial
+    const hasChanges = 
+      name !== initialDeckStateRef.current?.name ||
+      isPublic !== initialDeckStateRef.current?.isPublic ||
+      selectedCards.length !== initialDeckStateRef.current?.selectedCards.length ||
+      sideboard.length !== initialDeckStateRef.current?.sideboard.length ||
+      JSON.stringify(selectedCards.map(sc => ({id: sc.card.id, qty: sc.quantity}))) !== 
+        JSON.stringify(initialDeckStateRef.current?.selectedCards.map(sc => ({id: sc.card.id, qty: sc.quantity}))) ||
+      JSON.stringify(sideboard.map(sc => ({id: sc.card.id, qty: sc.quantity}))) !== 
+        JSON.stringify(initialDeckStateRef.current?.sideboard.map(sc => ({id: sc.card.id, qty: sc.quantity})))
+
+    if (hasChanges) {
+      const progress = {
+        name,
+        description,
+        isPublic,
+        selectedCards: selectedCards.map(sc => ({
+          cardId: sc.card.id,
+          cardName: sc.card.name,
+          quantity: sc.quantity
+        })),
+        sideboard: sideboard.map(sc => ({
+          cardId: sc.card.id,
+          cardName: sc.card.name,
+          quantity: sc.quantity
+        })),
+        deckRace,
+        timestamp: Date.now()
+      }
+      localStorage.setItem(storageKey, JSON.stringify(progress))
+    }
+  }, [name, description, isPublic, selectedCards, sideboard, deckRace, initialDeckStateRef, getStorageKey])
+
+  const loadProgress = useCallback(async (): Promise<boolean> => {
+    const storageKey = getStorageKey()
+    if (!storageKey) return false
+
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (!saved) return false
+
+      const progress = JSON.parse(saved)
+      
+      // Verificar que el progreso guardado sea de la misma raza
+      if (progress.deckRace !== deckRace) {
+        localStorage.removeItem(storageKey)
+        return false
+      }
+
+      // Si hay cartas guardadas, intentar restaurarlas
+      if (progress.selectedCards?.length > 0 || progress.sideboard?.length > 0) {
+        // Esperar a que las cartas se carguen
+        if (cards.length === 0) {
+          await new Promise(resolve => {
+            const checkCards = setInterval(() => {
+              if (cards.length > 0) {
+                clearInterval(checkCards)
+                resolve(true)
+              }
+            }, 100)
+            setTimeout(() => {
+              clearInterval(checkCards)
+              resolve(false)
+            }, 5000)
+          })
+        }
+
+        // Restaurar nombre, descripción y visibilidad
+        if (progress.name) setName(progress.name)
+        if (progress.description !== undefined) setDescription(progress.description)
+        setIsPublic(progress.isPublic ?? true)
+
+        // Restaurar cartas del mazo principal
+        const restoredMain: SelectedCard[] = []
+        for (const savedCard of progress.selectedCards || []) {
+          const card = cards.find(c => c.id === savedCard.cardId || c.name === savedCard.cardName)
+          if (card) {
+            restoredMain.push({
+              card,
+              quantity: savedCard.quantity
+            })
+          }
+        }
+
+        // Restaurar cartas del sideboard
+        const restoredSide: SelectedCard[] = []
+        for (const savedCard of progress.sideboard || []) {
+          const card = cards.find(c => c.id === savedCard.cardId || c.name === savedCard.cardName)
+          if (card) {
+            restoredSide.push({
+              card,
+              quantity: savedCard.quantity
+            })
+          }
+        }
+
+        if (restoredMain.length > 0 || restoredSide.length > 0) {
+          setSelectedCards(restoredMain)
+          setSideboard(restoredSide)
+          return true
+        }
+      } else if (progress.name) {
+        // Solo restaurar nombre si no hay cartas
+        setName(progress.name)
+        if (progress.description !== undefined) setDescription(progress.description)
+        setIsPublic(progress.isPublic ?? true)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('Error loading progress:', error)
+      const storageKey = getStorageKey()
+      if (storageKey) localStorage.removeItem(storageKey)
+      return false
+    }
+  }, [cards, deckRace, getStorageKey])
+
+  const clearProgress = useCallback(() => {
+    const storageKey = getStorageKey()
+    if (storageKey) {
+      localStorage.removeItem(storageKey)
+    }
+  }, [getStorageKey])
+
+  // Guardar el estado inicial después de cargar el mazo
+  useEffect(() => {
+    if (!loadingDeck && selectedCards.length > 0 && !initialDeckStateRef.current) {
+      initialDeckStateRef.current = {
+        name,
+        selectedCards: [...selectedCards],
+        sideboard: [...sideboard],
+        isPublic
+      }
+    }
+  }, [loadingDeck, selectedCards.length, sideboard.length, name, isPublic])
+
+  // Guardar progreso automáticamente cuando cambia el estado
+  useEffect(() => {
+    if (!loading && !loadingDeck && cards.length > 0 && initialDeckStateRef.current) {
+      saveProgress()
+    }
+  }, [saveProgress, loading, loadingDeck, cards.length])
+
+  // Cargar progreso guardado al montar el componente (solo una vez)
+  const hasLoadedProgressRef = useRef(false)
+  useEffect(() => {
+    if (!loading && !loadingDeck && cards.length > 0 && resolvedParams?.id && !hasLoadedProgressRef.current) {
+      hasLoadedProgressRef.current = true
+      loadProgress().then(hasProgress => {
+        if (hasProgress) {
+          Swal.fire({
+            icon: 'info',
+            title: 'Cambios recuperados',
+            text: 'Se han restaurado tus cambios no guardados',
+            confirmButtonColor: '#2D9B96',
+            background: '#121825',
+            color: '#F4C430',
+            timer: 3000,
+            showConfirmButton: false
+          })
+        }
+      })
+    }
+  }, [loading, loadingDeck, cards.length, resolvedParams?.id, loadProgress])
+
+  // Interceptar navegación hacia atrás para guardar progreso
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (initialDeckStateRef.current) {
+        saveProgress()
+      }
+    }
+
+    const handlePopState = () => {
+      // Si el modal no está abierto, guardar progreso antes de navegar
+      if (!selectedCardForView && initialDeckStateRef.current) {
+        saveProgress()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [saveProgress, selectedCardForView])
+
+  // Prevenir retroceso del navegador cuando el modal está abierto
+  useEffect(() => {
+    if (selectedCardForView) {
+      // Agregar una entrada al historial cuando se abre el modal
+      window.history.pushState({ modalOpen: true }, '')
+      modalHistoryPushedRef.current = true
+      
+      const handlePopState = () => {
+        // Si el modal está abierto, cerrarlo en lugar de navegar hacia atrás
+        setSelectedCardForView(null)
+        modalHistoryPushedRef.current = false
+      }
+      
+      window.addEventListener('popstate', handlePopState)
+      
+      return () => {
+        window.removeEventListener('popstate', handlePopState)
+        // Si el modal se cierra normalmente (no por botón de retroceso), hacer retroceder el historial
+        if (modalHistoryPushedRef.current && window.history.state?.modalOpen) {
+          window.history.back()
+          modalHistoryPushedRef.current = false
+        }
+      }
+    } else {
+      modalHistoryPushedRef.current = false
+    }
+  }, [selectedCardForView])
 
   // Resolver params
   useEffect(() => {
@@ -380,6 +609,16 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
       })
 
       if (response.ok) {
+        // Limpiar el progreso guardado después de guardar exitosamente
+        clearProgress()
+        hasLoadedProgressRef.current = false
+        // Actualizar el estado inicial para reflejar los cambios guardados
+        initialDeckStateRef.current = {
+          name,
+          selectedCards: [...selectedCards],
+          sideboard: [...sideboard],
+          isPublic
+        }
         await Swal.fire({
           icon: 'success',
           title: '¡Éxito!',
