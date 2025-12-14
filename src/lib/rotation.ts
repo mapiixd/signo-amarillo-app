@@ -2,19 +2,67 @@
 // Solo las cartas desde "Espiritu Samurai" en adelante están disponibles para crear barajas
 // Además, hay cartas reimpresas que están en rotación independientemente de su expansión original
 
-import { createClient } from '@supabase/supabase-js'
-import { config } from 'dotenv'
-
-config({ path: '.env' })
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { getSupabaseClient } from './supabase-server'
 
 const ROTATION_START_EXPANSION = 'Espiritu Samurai'
 
 // Cache para el display_order de la expansión de inicio de rotación
 let rotationStartOrder: number | null = null
+
+// Cache para las cartas en rotación individual
+let rotationCardsCache: Record<string, string> | null = null
+let rotationCardsCacheTimestamp: number = 0
+const ROTATION_CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+
+/**
+ * Obtiene las cartas en rotación individual desde la base de datos
+ */
+async function getRotationCardsFromDB(format: string = 'Imperio Racial'): Promise<Record<string, string>> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from('rotation_entries')
+    .select('card_name, rotation_expansion')
+    .eq('format', format)
+
+  if (error) {
+    console.error('Error fetching rotation cards from DB:', error)
+    return {}
+  }
+
+  const rotationCards: Record<string, string> = {}
+  if (data) {
+    data.forEach(entry => {
+      rotationCards[entry.card_name] = entry.rotation_expansion
+    })
+  }
+
+  return rotationCards
+}
+
+/**
+ * Obtiene las cartas en rotación individual (con cache)
+ */
+async function getRotationCards(format: string = 'Imperio Racial'): Promise<Record<string, string>> {
+  const now = Date.now()
+  
+  // Si el cache es válido, retornarlo
+  if (rotationCardsCache && (now - rotationCardsCacheTimestamp) < ROTATION_CACHE_DURATION) {
+    return rotationCardsCache
+  }
+
+  // Obtener de la base de datos y actualizar cache
+  rotationCardsCache = await getRotationCardsFromDB(format)
+  rotationCardsCacheTimestamp = now
+  return rotationCardsCache
+}
+
+/**
+ * Limpia el cache de rotación (útil después de actualizaciones)
+ */
+export function clearRotationCardsCache(): void {
+  rotationCardsCache = null
+  rotationCardsCacheTimestamp = 0
+}
 
 /**
  * Cartas específicas que están en rotación para el formato "Imperio Racial"
@@ -22,6 +70,8 @@ let rotationStartOrder: number | null = null
  * Estas son cartas reimpresas que rotan en la edición especificada.
  * 
  * Formato: nombre de carta (normalizado) -> expansión de rotación
+ * 
+ * @deprecated Usar getRotationCards() en su lugar. Mantenido para compatibilidad.
  */
 const ROTATED_CARDS_IMPERIO_RACIAL: Record<string, string> = {
   'Monumento Inmortal': 'Onyria',
@@ -80,6 +130,10 @@ const ROTATED_CARDS_IMPERIO_RACIAL: Record<string, string> = {
   'Fantasma del Puente': 'Napoleon',
   'Animita': 'Napoleon',
   'Mjolnir': 'Raciales Imp 2024',
+  'Sable de Napoleón': 'Hielo Inmortal',
+  'Fuente de la Juventud': 'Hielo Inmortal',
+  'Alicanto': 'Hielo Inmortal',
+  'Batalla de Waterloo': 'Hielo Inmortal',
 }
 
 /**
@@ -103,9 +157,10 @@ export async function isCardInIndividualRotation(cardName: string, format: strin
   }
 
   const normalizedName = normalizeCardName(cardName).toLowerCase()
+  const rotationCards = await getRotationCards(format)
   
   // Buscar coincidencia exacta primero
-  for (const [key, rotationExpansion] of Object.entries(ROTATED_CARDS_IMPERIO_RACIAL)) {
+  for (const [key, rotationExpansion] of Object.entries(rotationCards)) {
     const normalizedKey = normalizeCardName(key).toLowerCase()
     if (normalizedName === normalizedKey) {
       // Verificar si la edición de rotación está en rotación (display_order >= Espiritu Samurai)
@@ -115,7 +170,7 @@ export async function isCardInIndividualRotation(cardName: string, format: strin
   
   // Si no hay coincidencia exacta, buscar coincidencia parcial bidireccional
   // Esto maneja casos como "Caleuche" vs "El Caleuche" o variaciones de nombres
-  for (const [key, rotationExpansion] of Object.entries(ROTATED_CARDS_IMPERIO_RACIAL)) {
+  for (const [key, rotationExpansion] of Object.entries(rotationCards)) {
     const normalizedKey = normalizeCardName(key).toLowerCase()
     const isPartialMatch = (normalizedName.includes(normalizedKey) && normalizedKey.length >= 5) ||
                            (normalizedKey.includes(normalizedName) && normalizedName.length >= 5)
@@ -135,15 +190,16 @@ export async function isCardInIndividualRotation(cardName: string, format: strin
  * @param format Formato del juego
  * @returns Nombre de la expansión de rotación o null si no está en rotación individual
  */
-export function getCardRotationExpansion(cardName: string, format: string = 'Imperio Racial'): string | null {
+export async function getCardRotationExpansion(cardName: string, format: string = 'Imperio Racial'): Promise<string | null> {
   if (format !== 'Imperio Racial') {
     return null
   }
 
   const normalizedName = normalizeCardName(cardName).toLowerCase()
+  const rotationCards = await getRotationCards(format)
   
   // Primero buscar coincidencia exacta
-  for (const [key, rotationExpansion] of Object.entries(ROTATED_CARDS_IMPERIO_RACIAL)) {
+  for (const [key, rotationExpansion] of Object.entries(rotationCards)) {
     const normalizedKey = normalizeCardName(key).toLowerCase()
     if (normalizedName === normalizedKey) {
       return rotationExpansion
@@ -151,7 +207,7 @@ export function getCardRotationExpansion(cardName: string, format: string = 'Imp
   }
   
   // Si no hay coincidencia exacta, buscar coincidencia parcial
-  for (const [key, rotationExpansion] of Object.entries(ROTATED_CARDS_IMPERIO_RACIAL)) {
+  for (const [key, rotationExpansion] of Object.entries(rotationCards)) {
     const normalizedKey = normalizeCardName(key).toLowerCase()
     if ((normalizedName.includes(normalizedKey) && normalizedKey.length >= 5) ||
         (normalizedKey.includes(normalizedName) && normalizedName.length >= 5)) {
@@ -173,6 +229,7 @@ export async function getRotationStartOrder(): Promise<number | null> {
   }
 
   try {
+    const supabase = getSupabaseClient()
     const { data: expansion, error } = await supabase
       .from('expansions')
       .select('display_order')
@@ -205,6 +262,7 @@ export async function getRotatedExpansions(): Promise<string[]> {
       return []
     }
 
+    const supabase = getSupabaseClient()
     const { data: expansions, error } = await supabase
       .from('expansions')
       .select('name')
@@ -221,7 +279,7 @@ export async function getRotatedExpansions(): Promise<string[]> {
       return []
     }
 
-    return expansions.map(exp => exp.name)
+    return expansions.map((exp: { name: string }) => exp.name)
   } catch (error) {
     console.error('Error in getRotatedExpansions:', error)
     return []
@@ -242,6 +300,7 @@ export async function isExpansionInRotation(expansionName: string): Promise<bool
       return true
     }
 
+    const supabase = getSupabaseClient()
     const { data: expansion, error } = await supabase
       .from('expansions')
       .select('display_order')
@@ -280,7 +339,7 @@ export async function isCardInRotation(
   format: string = 'Imperio Racial'
 ): Promise<boolean> {
   // Verificar si la carta está en la lista de rotación individual
-  const rotationExpansion = getCardRotationExpansion(cardName, format)
+  const rotationExpansion = await getCardRotationExpansion(cardName, format)
   
   if (rotationExpansion !== null) {
     // Si está en la lista, verificar que su edición de rotación tenga display_order >= Espiritu Samurai
@@ -324,9 +383,12 @@ export async function filterCardsInRotation<T extends { name: string; expansion:
     // Crear un mapa de expansiones de rotación a su disponibilidad (cache)
     const rotationExpansionCache = new Map<string, boolean>()
 
+    // Obtener las cartas en rotación individual
+    const rotationCards = await getRotationCards(format)
+    
     return cards.filter(card => {
       // Verificar si la carta está en la lista de rotación individual
-      const rotationExpansion = getCardRotationExpansion(card.name, format)
+      const rotationExpansion = rotationCards[card.name] || null
       
       if (rotationExpansion !== null) {
         // Si está en la lista, verificar si su edición de rotación está disponible
@@ -356,4 +418,5 @@ export async function filterCardsInRotation<T extends { name: string; expansion:
  */
 export function clearRotationCache(): void {
   rotationStartOrder = null
+  clearRotationCardsCache()
 }

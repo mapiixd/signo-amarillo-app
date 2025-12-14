@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { filterCardsInRotation } from '@/lib/rotation'
+import { normalizeString } from '@/lib/utils'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
 export const dynamic = 'force-dynamic'
@@ -46,9 +47,8 @@ export async function GET(request: NextRequest) {
       // Nota: No filtramos por expansión aquí cuando rotation=true porque
       // algunas cartas pueden estar en rotación individual aunque su expansión no lo esté
 
-      if (search) {
-        query = query.ilike('name', `%${search}%`)
-      }
+      // No aplicamos el filtro de búsqueda aquí porque necesitamos filtrar sin tildes después
+      // Si hay búsqueda, obtendremos todas las cartas y filtraremos después
 
       if (type) {
         query = query.eq('type', type)
@@ -284,6 +284,15 @@ export async function GET(request: NextRequest) {
       
       return edidA - edidB
     })
+
+    // Aplicar filtro de búsqueda sin tildes si se solicita
+    if (search) {
+      const normalizedSearch = normalizeString(search)
+      filteredCards = filteredCards.filter(card => 
+        normalizeString(card.name).includes(normalizedSearch) ||
+        (card.description && normalizeString(card.description).includes(normalizedSearch))
+      )
+    }
 
     // Aplicar filtro de rotación si se solicita
     // Esto incluye tanto cartas por expansión como cartas individuales en rotación

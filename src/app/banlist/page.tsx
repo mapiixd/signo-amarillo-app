@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BANLISTS, getBanStatusLabel, getBanStatusIcon, type FormatType } from '@/lib/banlist'
+import { getBanStatusLabel, getBanStatusIcon, type FormatType, type BanlistEntry } from '@/lib/banlist'
 import { getCardImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
 import type { Card } from '@/types'
@@ -15,14 +15,57 @@ export default function BanlistPage() {
   const [cardsMap, setCardsMap] = useState<Map<string, CardWithImage>>(new Map())
   const [loading, setLoading] = useState(true)
   const [imagesLoaded, setImagesLoaded] = useState(false)
+  const [banlists, setBanlists] = useState<Record<FormatType, BanlistEntry[]>>({
+    'Imperio Racial': [],
+    'VCR': [],
+    'Triadas': []
+  })
 
   useEffect(() => {
     document.title = 'Banlist | El Signo Amarillo';
   }, [])
 
+  // Cargar banlists desde la base de datos
   useEffect(() => {
-    fetchBanlistCards()
+    const loadBanlists = async () => {
+      try {
+        const response = await fetch('/api/admin/banlist')
+        if (response.ok) {
+          const data = await response.json()
+          const entries: BanlistEntry[] = data.entries || []
+          
+          const banlistsData: Record<FormatType, BanlistEntry[]> = {
+            'Imperio Racial': [],
+            'VCR': [],
+            'Triadas': []
+          }
+          
+          entries.forEach((entry: any) => {
+            const format = entry.format as FormatType
+            if (banlistsData[format]) {
+              banlistsData[format].push({
+                cardName: entry.card_name,
+                status: entry.status as BanlistEntry['status'],
+                maxCopies: entry.max_copies
+              })
+            }
+          })
+          
+          setBanlists(banlistsData)
+        }
+      } catch (error) {
+        console.error('Error loading banlists:', error)
+      }
+    }
+    
+    loadBanlists()
   }, [])
+
+  useEffect(() => {
+    if (banlists['Imperio Racial'].length > 0 || banlists['VCR'].length > 0 || banlists['Triadas'].length > 0) {
+      fetchBanlistCards()
+    }
+  }, [banlists])
 
   // Función para pre-cargar una imagen
   const preloadImage = (src: string): Promise<void> => {
@@ -49,7 +92,7 @@ export default function BanlistPage() {
 
       // Recopilar todas las URLs de imágenes
       formats.forEach(format => {
-        BANLISTS[format].forEach(entry => {
+        banlists[format].forEach(entry => {
           const card = cardsMap.get(entry.cardName)
           if (card && (card.image_url || card.image_file)) {
             const imageUrl = getCardImageUrl(card.image_url || card.image_file, card.expansion)
@@ -74,7 +117,8 @@ export default function BanlistPage() {
     }
 
     preloadAllImages()
-  }, [cardsMap, loading])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardsMap, loading, banlists])
 
   const fetchBanlistCards = async () => {
     try {
@@ -93,7 +137,8 @@ export default function BanlistPage() {
       // Crear un mapa con el estado de ban para cada carta
       const map = new Map<string, CardWithImage>()
       formats.forEach(format => {
-        BANLISTS[format].forEach(entry => {
+        const currentBanlist = banlists[format] || []
+        currentBanlist.forEach((entry: BanlistEntry) => {
           // Buscar la carta por nombre (coincidencia exacta o parcial)
           const card = cardsData.find(c => {
             const cardNameLower = c.name.toLowerCase().trim()
@@ -163,7 +208,7 @@ export default function BanlistPage() {
 
         <div className="space-y-8">
           {formats.map((format) => {
-            const banlist = BANLISTS[format]
+            const banlist = banlists[format]
             const banned = banlist.filter(c => c.status === 'banned')
             const limited1 = banlist.filter(c => c.status === 'limited-1')
             const limited2 = banlist.filter(c => c.status === 'limited-2')

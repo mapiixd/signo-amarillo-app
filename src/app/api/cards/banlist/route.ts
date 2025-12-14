@@ -1,17 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
-import { BANLISTS, type FormatType } from '@/lib/banlist'
+import { type FormatType, type BanlistEntry } from '@/lib/banlist'
+
+// Función auxiliar para obtener banlists desde la base de datos
+async function getBanlistsFromDB(): Promise<Record<FormatType, BanlistEntry[]>> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from('banlist_entries')
+    .select('*')
+    .order('card_name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching banlists from DB:', error)
+    return {
+      'Imperio Racial': [],
+      'VCR': [],
+      'Triadas': []
+    }
+  }
+
+  const banlists: Record<FormatType, BanlistEntry[]> = {
+    'Imperio Racial': [],
+    'VCR': [],
+    'Triadas': []
+  }
+
+  if (data) {
+    data.forEach(entry => {
+      const format = entry.format as FormatType
+      if (banlists[format]) {
+        banlists[format].push({
+          cardName: entry.card_name,
+          status: entry.status as BanlistEntry['status'],
+          maxCopies: entry.max_copies
+        })
+      }
+    })
+  }
+
+  return banlists
+}
 
 // GET /api/cards/banlist - Obtener todas las cartas de la banlist
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseClient()
+    // Obtener todas las banlists desde la base de datos
+    const banlists = await getBanlistsFromDB()
+    
     // Obtener todos los nombres de cartas de todas las banlists
     const allCardNames = new Set<string>()
     const formats: FormatType[] = ['Imperio Racial', 'VCR', 'Triadas']
     
     formats.forEach(format => {
-      BANLISTS[format].forEach(entry => {
+      banlists[format].forEach(entry => {
         allCardNames.add(entry.cardName)
       })
     })
@@ -86,7 +128,7 @@ export async function GET(request: NextRequest) {
     const result: Record<string, any> = {}
     
     formats.forEach(format => {
-      BANLISTS[format].forEach(entry => {
+      banlists[format].forEach(entry => {
         const banlistName = entry.cardName.toLowerCase().trim()
         
         // Buscar coincidencia exacta primero

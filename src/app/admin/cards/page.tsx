@@ -470,19 +470,237 @@ export default function AdminCardsPage() {
                       {getStatusBadge(card)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link
-                        href={`/admin/cards/${card.id}/edit`}
-                        className="text-[#4ECDC4] hover:text-[#F4C430] mr-4 transition-colors"
-                      >
-                        Editar
-                      </Link>
+                      <div className="flex flex-col gap-1">
+                        <Link
+                          href={`/admin/cards/${card.id}/edit`}
+                          className="text-[#4ECDC4] hover:text-[#F4C430] transition-colors"
+                        >
+                          Editar
+                        </Link>
+                        <button
+                          className="text-[#F4C430] hover:text-[#FFD700] transition-colors text-left"
+                          onClick={async () => {
+                            const { value: format } = await Swal.fire({
+                              title: 'Gestionar Banlist',
+                              text: `Selecciona el formato para "${card.name}"`,
+                              input: 'select',
+                              inputOptions: {
+                                'Imperio Racial': 'Imperio Racial',
+                                'VCR': 'VCR',
+                                'Triadas': 'Triadas'
+                              },
+                              inputPlaceholder: 'Selecciona un formato',
+                              showCancelButton: true,
+                              cancelButtonText: 'Cancelar',
+                              confirmButtonColor: '#2D9B96',
+                              cancelButtonColor: '#6b7280',
+                              background: '#121825',
+                              color: '#E8E8E8',
+                              width: '28rem',
+                              padding: '1.5rem',
+                              customClass: {
+                                popup: 'border-2 border-[#2D9B96]',
+                                title: 'text-[#F4C430]',
+                                htmlContainer: 'text-[#E8E8E8]',
+                                input: 'swal2-select-custom'
+                              },
+                              inputValidator: (value) => {
+                                if (!value) {
+                                  return 'Debes seleccionar un formato'
+                                }
+                              }
+                            })
+
+                            if (format) {
+                              const { value: action } = await Swal.fire({
+                                title: 'Acción',
+                                text: `¿Qué acción deseas realizar?`,
+                                input: 'select',
+                                inputOptions: {
+                                  'allowed': 'Permitida (3 copias)',
+                                  'limited-2': 'Limitada a 2 copias',
+                                  'limited-1': 'Limitada a 1 copia',
+                                  'banned': 'Prohibida (0 copias)',
+                                  'remove': 'Eliminar de banlist'
+                                },
+                                inputPlaceholder: 'Selecciona una acción',
+                                showCancelButton: true,
+                                cancelButtonText: 'Cancelar',
+                                confirmButtonColor: '#2D9B96',
+                                cancelButtonColor: '#6b7280',
+                                background: '#121825',
+                                color: '#E8E8E8',
+                                width: '28rem',
+                                padding: '1.5rem',
+                                customClass: {
+                                  popup: 'border-2 border-[#2D9B96]',
+                                  title: 'text-[#F4C430]',
+                                  htmlContainer: 'text-[#E8E8E8]',
+                                  input: 'swal2-select-custom'
+                                },
+                                inputValidator: (value) => {
+                                  if (!value) {
+                                    return 'Debes seleccionar una acción'
+                                  }
+                                }
+                              })
+
+                              if (action) {
+                                try {
+                                  if (action === 'remove') {
+                                    const response = await fetch(`/api/admin/banlist?card_name=${encodeURIComponent(card.name)}&format=${encodeURIComponent(format)}`, {
+                                      method: 'DELETE'
+                                    })
+
+                                    if (!response.ok) {
+                                      const errorData = await response.json()
+                                      throw new Error(errorData.error || 'Error al eliminar de banlist')
+                                    }
+
+                                    await Swal.fire({
+                                      icon: 'success',
+                                      title: '¡Eliminada!',
+                                      text: `La carta ha sido eliminada de la banlist`,
+                                      confirmButtonColor: '#2D9B96',
+                                      background: '#121825',
+                                      color: '#F4C430',
+                                      timer: 2000,
+                                      showConfirmButton: false
+                                    })
+                                  } else {
+                                    const maxCopies = action === 'banned' ? 0 : action === 'limited-1' ? 1 : action === 'limited-2' ? 2 : 3
+                                    const response = await fetch('/api/admin/banlist', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json'
+                                      },
+                                      body: JSON.stringify({
+                                        card_name: card.name,
+                                        format,
+                                        status: action,
+                                        max_copies: maxCopies
+                                      })
+                                    })
+
+                                    if (!response.ok) {
+                                      const errorData = await response.json()
+                                      throw new Error(errorData.error || 'Error al actualizar banlist')
+                                    }
+
+                                    await Swal.fire({
+                                      icon: 'success',
+                                      title: '¡Actualizada!',
+                                      text: `La carta ha sido actualizada en la banlist`,
+                                      confirmButtonColor: '#2D9B96',
+                                      background: '#121825',
+                                      color: '#F4C430',
+                                      timer: 2000,
+                                      showConfirmButton: false
+                                    })
+                                  }
+                                } catch (error: any) {
+                                  console.error('Error updating banlist:', error)
+                                  await Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: error.message || 'No se pudo actualizar la banlist',
+                                    confirmButtonColor: '#dc2626',
+                                    background: '#121825',
+                                    color: '#E8E8E8'
+                                  })
+                                }
+                              }
+                            }
+                          }}
+                        >
+                          Banlist
+                        </button>
+                        <button
+                          className="text-purple-400 hover:text-purple-300 transition-colors text-left"
+                          onClick={async () => {
+                            const { value: rotationExpansion } = await Swal.fire({
+                              title: 'Agregar a Rotación',
+                              text: `Selecciona la expansión de rotación para "${card.name}"`,
+                              input: 'select',
+                              inputOptions: allExpansions.reduce((acc, exp) => {
+                                acc[exp] = exp
+                                return acc
+                              }, {} as Record<string, string>),
+                              inputPlaceholder: 'Selecciona una expansión',
+                              showCancelButton: true,
+                              cancelButtonText: 'Cancelar',
+                              confirmButtonColor: '#2D9B96',
+                              cancelButtonColor: '#6b7280',
+                              background: '#121825',
+                              color: '#E8E8E8',
+                              width: '28rem',
+                              padding: '1.5rem',
+                              customClass: {
+                                popup: 'border-2 border-[#2D9B96]',
+                                title: 'text-[#F4C430]',
+                                htmlContainer: 'text-[#E8E8E8]',
+                                input: 'swal2-select-custom'
+                              },
+                              inputValidator: (value) => {
+                                if (!value) {
+                                  return 'Debes seleccionar una expansión'
+                                }
+                              }
+                            })
+
+                            if (rotationExpansion) {
+                              try {
+                                const response = await fetch('/api/admin/rotation', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json'
+                                  },
+                                  body: JSON.stringify({
+                                    card_name: card.name,
+                                    format: 'Imperio Racial',
+                                    rotation_expansion: rotationExpansion
+                                  })
+                                })
+
+                                if (!response.ok) {
+                                  const errorData = await response.json()
+                                  throw new Error(errorData.error || 'Error al agregar a rotación')
+                                }
+
+                                await Swal.fire({
+                                  icon: 'success',
+                                  title: '¡Agregada!',
+                                  text: `La carta ha sido agregada a la rotación`,
+                                  confirmButtonColor: '#2D9B96',
+                                  background: '#121825',
+                                  color: '#F4C430',
+                                  timer: 2000,
+                                  showConfirmButton: false
+                                })
+                              } catch (error: any) {
+                                console.error('Error adding to rotation:', error)
+                                await Swal.fire({
+                                  icon: 'error',
+                                  title: 'Error',
+                                  text: error.message || 'No se pudo agregar a rotación',
+                                  confirmButtonColor: '#dc2626',
+                                  background: '#121825',
+                                  color: '#E8E8E8'
+                                })
+                              }
+                            }
+                          }}
+                        >
+                          Rotación
+                        </button>
+                      </div>
                       <button
-                        className="text-red-400 hover:text-red-300 transition-colors"
+                        className="text-red-400 hover:text-red-300 transition-colors mt-2"
                         onClick={async () => {
                           const result = await Swal.fire({
                             icon: 'warning',
                             title: '¿Estás seguro?',
-                            text: '¿Quieres eliminar esta carta? Esta acción no se puede deshacer.',
+                            text: `¿Quieres eliminar la carta "${card.name}"? Esta acción no se puede deshacer.`,
                             showCancelButton: true,
                             confirmButtonColor: '#dc2626',
                             cancelButtonColor: '#6b7280',
@@ -492,15 +710,40 @@ export default function AdminCardsPage() {
                             color: '#E8E8E8'
                           })
                           if (result.isConfirmed) {
-                            // TODO: Implementar eliminación
-                            await Swal.fire({
-                              icon: 'info',
-                              title: 'Pendiente',
-                              text: 'Función de eliminación por implementar',
-                              confirmButtonColor: '#2563eb',
-                              background: '#121825',
-                              color: '#E8E8E8'
-                            })
+                            try {
+                              const response = await fetch(`/api/admin/cards/${card.id}`, {
+                                method: 'DELETE'
+                              })
+
+                              if (!response.ok) {
+                                const errorData = await response.json()
+                                throw new Error(errorData.error || 'Error al eliminar la carta')
+                              }
+
+                              await Swal.fire({
+                                icon: 'success',
+                                title: '¡Eliminada!',
+                                text: `La carta "${card.name}" ha sido eliminada exitosamente`,
+                                confirmButtonColor: '#2D9B96',
+                                background: '#121825',
+                                color: '#F4C430',
+                                timer: 2000,
+                                showConfirmButton: false
+                              })
+
+                              // Recargar las cartas después de eliminar
+                              fetchCards()
+                            } catch (error: any) {
+                              console.error('Error deleting card:', error)
+                              await Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: error.message || 'No se pudo eliminar la carta',
+                                confirmButtonColor: '#dc2626',
+                                background: '#121825',
+                                color: '#E8E8E8'
+                              })
+                            }
                           }
                         }}
                       >

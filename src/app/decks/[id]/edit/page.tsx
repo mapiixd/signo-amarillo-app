@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Swal from 'sweetalert2'
 import { Card as CardType, CARD_TYPE_LABELS, DeckWithCards } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
-import { getCardBanStatus, isCardBanned, getMaxCopies, getBanStatusIcon, getBanStatusLabel, type FormatType } from '@/lib/banlist'
+import { getCardBanStatus, isCardBanned, getMaxCopies, getBanStatusIcon, getBanStatusLabel, type FormatType, type BanStatus } from '@/lib/banlist'
 import Footer from '@/components/Footer'
 
 interface SelectedCard {
@@ -44,6 +44,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
   const [loadingDeck, setLoadingDeck] = useState(true)
   const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
   const [selectedCardForView, setSelectedCardForView] = useState<CardType | null>(null)
+  const [banlistCache, setBanlistCache] = useState<Record<string, { status: BanStatus; maxCopies: number } | null>>({})
   
   // Referencias para auto-scroll
   const mainDeckScrollRef = useRef<HTMLDivElement>(null)
@@ -293,6 +294,31 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
     }
   }, [resolvedParams])
 
+  // Precargar banlist para todas las cartas cuando cambian
+  useEffect(() => {
+    const loadBanlistForCards = async () => {
+      if (cards.length === 0) return
+      
+      const format = 'Imperio Racial' as FormatType
+      const cache: Record<string, { status: BanStatus; maxCopies: number } | null> = {}
+      
+      // Cargar banlist para todas las cartas
+      const promises = cards.map(async (card) => {
+        const status = await getCardBanStatus(card.name, format)
+        return { name: card.name, status }
+      })
+      
+      const results = await Promise.all(promises)
+      results.forEach(({ name, status }) => {
+        cache[name] = status
+      })
+      
+      setBanlistCache(cache)
+    }
+    
+    loadBanlistForCards()
+  }, [cards])
+
   // Auto-scroll solo cuando se agrega una nueva carta al mazo principal (no cuando se modifica cantidad)
   useEffect(() => {
     if (mainDeckScrollRef.current && activeTab === 'main' && selectedCards.length > prevMainDeckLengthRef.current) {
@@ -395,7 +421,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
     return race === '' || race === 'Sin Raza'
   }
 
-  const handleAddCard = (card: CardType, toSideboard: boolean = false) => {
+  const handleAddCard = async (card: CardType, toSideboard: boolean = false) => {
     const currentDeck = toSideboard ? sideboard : selectedCards
     const setDeck = toSideboard ? setSideboard : setSelectedCards
     
@@ -434,16 +460,21 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
     
     // Validar si la carta está prohibida en el formato
     const format = 'Imperio Racial' as FormatType
-    if (isCardBanned(card.name, format)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Carta Prohibida',
-        text: `${card.name} está PROHIBIDA en el formato ${format}`,
-        confirmButtonColor: '#2D9B96',
-        background: '#121825',
-        color: '#F4C430'
-      })
-      return
+    try {
+      const isBanned = await isCardBanned(card.name, format)
+      if (isBanned) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Carta Prohibida',
+          text: `${card.name} está PROHIBIDA en el formato ${format}`,
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430'
+        })
+        return
+      }
+    } catch (error) {
+      console.error('Error checking if card is banned:', error)
     }
     
     // Validar cartas únicas (que contengan "Única." en su descripción)
@@ -461,20 +492,24 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
     }
     
     // Validar límite de copias según banlist (puede ser 1, 2 o 3)
-    const maxAllowed = getMaxCopies(card.name, format)
-    if (totalInBothDecks >= maxAllowed) {
-      const banStatus = getCardBanStatus(card.name, format)
-      const statusText = banStatus ? getBanStatusLabel(banStatus.status, banStatus.maxCopies) : ''
-      
-      Swal.fire({
-        icon: 'warning',
-        title: 'Límite alcanzado',
-        text: `No puedes tener más de ${maxAllowed} ${maxAllowed === 1 ? 'copia' : 'copias'} de ${card.name}${statusText ? ` (${statusText})` : ''}`,
-        confirmButtonColor: '#2D9B96',
-        background: '#121825',
-        color: '#F4C430'
-      })
-      return
+    try {
+      const maxAllowed = await getMaxCopies(card.name, format)
+      if (totalInBothDecks >= maxAllowed) {
+        const banStatus = await getCardBanStatus(card.name, format)
+        const statusText = banStatus ? getBanStatusLabel(banStatus.status, banStatus.maxCopies) : ''
+        
+        Swal.fire({
+          icon: 'warning',
+          title: 'Límite alcanzado',
+          text: `No puedes tener más de ${maxAllowed} ${maxAllowed === 1 ? 'copia' : 'copias'} de ${card.name}${statusText ? ` (${statusText})` : ''}`,
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430'
+        })
+        return
+      }
+    } catch (error) {
+      console.error('Error checking card limits:', error)
     }
     
     // Validar máximo 4 aliados sin raza en el mazo principal
@@ -699,8 +734,8 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
   const filteredCards = cards
     .filter(card => {
-      const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesAbility = !abilityFilter || (card.description?.toLowerCase().includes(abilityFilter.toLowerCase()) ?? false)
+      const matchesSearch = !searchTerm || (card.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(searchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')))
+      const matchesAbility = !abilityFilter || (card.description?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(abilityFilter.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')) ?? false)
       const matchesType = typeFilter === 'Todas' || card.type === typeFilter
       const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
       
@@ -884,7 +919,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                 const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
                 const totalCopies = getTotalCopiesByName(card.name)
                 const format = 'Imperio Racial' as FormatType
-                const banStatus = getCardBanStatus(card.name, format)
+                const banStatus = banlistCache[card.name] || null
                 const isBanned = banStatus?.status === 'banned'
                 const isUniqueCard = card.description?.includes('Única.') || false
                 

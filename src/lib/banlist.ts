@@ -1,5 +1,7 @@
 // Sistema de baneos y restricciones por formato
 
+import { getSupabaseClient } from './supabase-server'
+
 export type BanStatus = 'banned' | 'limited-1' | 'limited-2' | 'allowed'
 
 export interface BanlistEntry {
@@ -10,76 +12,81 @@ export interface BanlistEntry {
 
 export type FormatType = 'Imperio Racial' | 'VCR' | 'Triadas'
 
-// Lista de baneos por formato
-export const BANLISTS: Record<FormatType, BanlistEntry[]> = {
-  'Imperio Racial': [
-    // Prohibidas (0 copias)
-    { cardName: 'Niten Ichi-Ryu', status: 'banned', maxCopies: 0 },
-    { cardName: 'Senso-ji', status: 'banned', maxCopies: 0 },
-    { cardName: 'Hitodama', status: 'banned', maxCopies: 0 },
-    { cardName: 'Ishikawa Goemon', status: 'banned', maxCopies: 0 },
-    { cardName: 'Tenshi X-2', status: 'banned', maxCopies: 0 },
-    { cardName: 'Fusil Patriota', status: 'banned', maxCopies: 0 },
-    { cardName: 'Flechero', status: 'banned', maxCopies: 0 },
-    { cardName: 'Horda Tenebris', status: 'banned', maxCopies: 0 },
-    { cardName: 'Perseguir el Sol', status: 'banned', maxCopies: 0 },
-    { cardName: 'Maho no Meiso', status: 'banned', maxCopies: 0 },
-    
-    // Limitadas a 1 copia
-    { cardName: 'Cthulhu', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Padre de la Patria', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Ramón Freire', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Ciudad de los Césares', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Anillo de Tierra', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'El Rey y el Verdugo', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Shakar Raj', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Paladín Bestiarium', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'El Mago', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Cancha Rayada', status: 'limited-1', maxCopies: 1 },
-    
-    // Limitadas a 2 copias
-    { cardName: 'Ereshkigal', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Sheut', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Shoki', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Alicia en Wonderland', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Rey de Amarillo', status: 'limited-2', maxCopies: 2 },
-    { cardName: 'Anillo de Vacío', status: 'limited-2', maxCopies: 2 },
-  ],
+// Cache para las banlists
+let banlistCache: Record<FormatType, BanlistEntry[]> | null = null
+let banlistCacheTimestamp: number = 0
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+
+/**
+ * Obtiene todas las banlists desde la base de datos
+ */
+async function getBanlistsFromDB(): Promise<Record<FormatType, BanlistEntry[]>> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from('banlist_entries')
+    .select('*')
+    .order('card_name', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching banlists from DB:', error)
+    return {
+      'Imperio Racial': [],
+      'VCR': [],
+      'Triadas': []
+    }
+  }
+
+  const banlists: Record<FormatType, BanlistEntry[]> = {
+    'Imperio Racial': [],
+    'VCR': [],
+    'Triadas': []
+  }
+
+  if (data) {
+    data.forEach(entry => {
+      const format = entry.format as FormatType
+      if (banlists[format]) {
+        banlists[format].push({
+          cardName: entry.card_name,
+          status: entry.status as BanStatus,
+          maxCopies: entry.max_copies
+        })
+      }
+    })
+  }
+
+  return banlists
+}
+
+/**
+ * Obtiene las banlists (con cache)
+ */
+async function getBanlists(): Promise<Record<FormatType, BanlistEntry[]>> {
+  const now = Date.now()
   
-  'VCR': [
-    // Prohibidas (0 copias)
-    { cardName: 'Momificar', status: 'banned', maxCopies: 0 },
-    { cardName: 'Septimus', status: 'banned', maxCopies: 0 },
-    { cardName: 'Maho no Meiso', status: 'banned', maxCopies: 0 },
-    { cardName: 'Kogarasumaru', status: 'banned', maxCopies: 0 },
-    
-    // Limitadas a 1 copia
-    { cardName: 'París', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Onsen', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Oda Nobunaga', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Azi Sruvara', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Piramide Roja', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Pirata Wokou', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Escorpión de Seth', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Monitor Araucano', status: 'limited-1', maxCopies: 1 },
-    { cardName: 'Ayyappan', status: 'limited-1', maxCopies: 1 },
-  ],
-  
-  'Triadas': [
-    // Prohibidas (0 copias)
-    { cardName: 'La Torre', status: 'banned', maxCopies: 0 },
-    { cardName: 'Rey de Amarillo', status: 'banned', maxCopies: 0 },
-    { cardName: 'Shub-Niggurath', status: 'banned', maxCopies: 0 },
-    { cardName: 'Maho No Meiso', status: 'banned', maxCopies: 0 },
-    { cardName: 'León Indiferente', status: 'banned', maxCopies: 0 },
-    { cardName: 'Gengis Kan', status: 'banned', maxCopies: 0 },
-    { cardName: 'Apofis', status: 'banned', maxCopies: 0 },
-  ],
+  // Si el cache es válido, retornarlo
+  if (banlistCache && (now - banlistCacheTimestamp) < CACHE_DURATION) {
+    return banlistCache
+  }
+
+  // Obtener de la base de datos y actualizar cache
+  banlistCache = await getBanlistsFromDB()
+  banlistCacheTimestamp = now
+  return banlistCache
+}
+
+/**
+ * Limpia el cache de banlists (útil después de actualizaciones)
+ */
+export function clearBanlistCache(): void {
+  banlistCache = null
+  banlistCacheTimestamp = 0
 }
 
 // Función para obtener el estado de una carta en un formato específico
-export function getCardBanStatus(cardName: string, format: FormatType): BanlistEntry | null {
-  const banlist = BANLISTS[format]
+export async function getCardBanStatus(cardName: string, format: FormatType): Promise<BanlistEntry | null> {
+  const banlists = await getBanlists()
+  const banlist = banlists[format]
   if (!banlist) return null
   
   // Buscar coincidencia exacta (ignorando mayúsculas/minúsculas y espacios al inicio/final)
@@ -90,15 +97,29 @@ export function getCardBanStatus(cardName: string, format: FormatType): BanlistE
 }
 
 // Función para verificar si una carta está prohibida
-export function isCardBanned(cardName: string, format: FormatType): boolean {
-  const status = getCardBanStatus(cardName, format)
+export async function isCardBanned(cardName: string, format: FormatType): Promise<boolean> {
+  const status = await getCardBanStatus(cardName, format)
   return status?.status === 'banned'
 }
 
 // Función para obtener el máximo de copias permitidas
-export function getMaxCopies(cardName: string, format: FormatType): number {
-  const status = getCardBanStatus(cardName, format)
+export async function getMaxCopies(cardName: string, format: FormatType): Promise<number> {
+  const status = await getCardBanStatus(cardName, format)
   return status?.maxCopies ?? 3 // Por defecto, 3 copias
+}
+
+// Función sincrónica para obtener banlists (para compatibilidad con código existente)
+// Nota: Esta función puede retornar datos desactualizados si el cache no está actualizado
+export function getBanlistsSync(): Record<FormatType, BanlistEntry[]> {
+  if (!banlistCache) {
+    // Si no hay cache, retornar vacío (el código async debería inicializarlo)
+    return {
+      'Imperio Racial': [],
+      'VCR': [],
+      'Triadas': []
+    }
+  }
+  return banlistCache
 }
 
 // Función para obtener el icono según el estado

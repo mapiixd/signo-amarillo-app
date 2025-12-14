@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
+import { normalizeString } from '@/lib/utils'
 
 // GET /api/admin/cards - Obtener cartas para administración con paginación
 export async function GET(request: NextRequest) {
@@ -16,62 +17,73 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit
 
-    // Query para obtener el total de cartas
-    let countQuery = supabase
-      .from('cards')
-      .select('*', { count: 'exact', head: true })
+    // Obtener TODAS las cartas en lotes (sin límite de 1000)
+    let allCards: any[] = []
+    let from = 0
+    const batchSize = 1000
+    let hasMore = true
 
-    if (expansion) {
-      countQuery = countQuery.eq('expansion', expansion)
+    while (hasMore) {
+      let query = supabase
+        .from('cards')
+        .select('*')
+        .range(from, from + batchSize - 1)
+
+      if (expansion) {
+        query = query.eq('expansion', expansion)
+      }
+      // No aplicamos el filtro de búsqueda aquí porque necesitamos filtrar sin tildes después
+      if (type) {
+        query = query.eq('type', type)
+      }
+      if (race) {
+        query = query.eq('race', race)
+      }
+      if (rarity) {
+        query = query.eq('rarity', rarity)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        throw error
+      }
+
+      if (data && data.length > 0) {
+        allCards = allCards.concat(data)
+        from += batchSize
+      }
+
+      if (!data || data.length < batchSize) {
+        hasMore = false
+      }
     }
+
+    // Aplicar filtro de búsqueda sin tildes si se solicita
+    let filteredCards = allCards
     if (search) {
-      countQuery = countQuery.ilike('name', `%${search}%`)
-    }
-    if (type) {
-      countQuery = countQuery.eq('type', type)
-    }
-    if (race) {
-      countQuery = countQuery.eq('race', race)
-    }
-    if (rarity) {
-      countQuery = countQuery.eq('rarity', rarity)
+      const normalizedSearch = normalizeString(search)
+      filteredCards = filteredCards.filter(card => 
+        normalizeString(card.name).includes(normalizedSearch) ||
+        (card.description && normalizeString(card.description).includes(normalizedSearch))
+      )
     }
 
-    const { count: totalCount, error: countError } = await countQuery
+    // Calcular el total después del filtro de búsqueda
+    const totalCount = filteredCards.length
 
-    if (countError) {
-      throw countError
-    }
+    // Ordenar y paginar
+    const sortedCards = filteredCards.sort((a, b) => {
+      // Ordenar por expansión primero
+      if (a.expansion !== b.expansion) {
+        return a.expansion.localeCompare(b.expansion)
+      }
+      // Luego por image_file
+      return (a.image_file || '').localeCompare(b.image_file || '')
+    })
 
-    // Query para obtener las cartas paginadas
-    let dataQuery = supabase
-      .from('cards')
-      .select('*')
-      .order('expansion', { ascending: true })
-      .order('image_file', { ascending: true })
-      .range(offset, offset + limit - 1)
-
-    if (expansion) {
-      dataQuery = dataQuery.eq('expansion', expansion)
-    }
-    if (search) {
-      dataQuery = dataQuery.ilike('name', `%${search}%`)
-    }
-    if (type) {
-      dataQuery = dataQuery.eq('type', type)
-    }
-    if (race) {
-      dataQuery = dataQuery.eq('race', race)
-    }
-    if (rarity) {
-      dataQuery = dataQuery.eq('rarity', rarity)
-    }
-
-    const { data: cards, error: dataError } = await dataQuery
-
-    if (dataError) {
-      throw dataError
-    }
+    // Aplicar paginación
+    const cards = sortedCards.slice(offset, offset + limit)
 
     // Calcular información de paginación
     const totalPages = Math.ceil((totalCount || 0) / limit)
