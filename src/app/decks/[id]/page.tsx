@@ -235,11 +235,146 @@ export default function DeckViewPage() {
     : sortCards(deck.sideboard)
 
   const handleExportImage = async () => {
-    if (!deckViewRef.current || !deck) return
+    if (!deck) return
     
     setExporting(true)
     
     try {
+      // Detectar Safari en iOS
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      
+      // Si es Safari o iOS, usar exportación server-side primero
+      if (isSafari || isIOS) {
+        try {
+          const response = await fetch(`/api/decks/${params.id}/export`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              activeTab: activeTab,
+              width: 1000
+            })
+          })
+          
+          if (response.ok) {
+            // Descargar la imagen
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_${activeTab}.jpg`
+            link.href = url
+            link.click()
+            URL.revokeObjectURL(url)
+            
+            setExporting(false)
+            return
+          }
+          
+          // Si falla el servidor, intentar método alternativo optimizado para Safari/iOS
+          console.warn('Servidor no disponible, usando método alternativo para Safari/iOS')
+          
+        } catch (serverError) {
+          console.error('Error en exportación server-side:', serverError)
+        }
+        
+        // Método alternativo para Safari/iOS: exportar con dimensiones reducidas
+        if (!deckViewRef.current) {
+          setExporting(false)
+          return
+        }
+        
+        try {
+          // Configurar el contenedor con dimensiones más pequeñas para Safari/iOS
+          const exportWidth = 800 // Reducir ancho para Safari/iOS
+          deckViewRef.current.style.position = 'absolute'
+          deckViewRef.current.style.top = '0'
+          deckViewRef.current.style.left = '-9999px'
+          deckViewRef.current.style.width = `${exportWidth}px`
+          deckViewRef.current.style.maxWidth = `${exportWidth}px`
+          deckViewRef.current.style.minWidth = `${exportWidth}px`
+          deckViewRef.current.style.visibility = 'visible'
+          deckViewRef.current.style.opacity = '1'
+          deckViewRef.current.style.background = '#0A0E1A'
+          deckViewRef.current.style.padding = '24px'
+          
+          await new Promise(resolve => setTimeout(resolve, 300))
+          
+          // Capturar con html2canvas usando configuración optimizada para Safari/iOS
+          const canvas = await html2canvas(deckViewRef.current, {
+            backgroundColor: '#0A0E1A',
+            scale: 1.5, // Reducir escala para Safari/iOS
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            foreignObjectRendering: false,
+            width: exportWidth,
+            windowHeight: deckViewRef.current.scrollHeight,
+            onclone: (clonedDoc, element) => {
+              // Ocultar botones y footer
+              const actionButtons = element.querySelectorAll('button')
+              actionButtons.forEach((btn) => {
+                const htmlBtn = btn as HTMLElement
+                htmlBtn.style.display = 'none'
+              })
+              const footer = element.querySelector('footer')
+              if (footer) footer.style.display = 'none'
+              
+              // Asegurar que los badges de cantidad sean perfectamente circulares en Safari/iOS
+              const badges = element.querySelectorAll('.rounded-full')
+              badges.forEach((badge) => {
+                const htmlBadge = badge as HTMLElement
+                if (htmlBadge.classList.contains('w-12') && htmlBadge.classList.contains('h-12')) {
+                  htmlBadge.style.borderRadius = '50%'
+                  htmlBadge.style.width = '48px'
+                  htmlBadge.style.height = '48px'
+                  htmlBadge.style.minWidth = '48px'
+                  htmlBadge.style.minHeight = '48px'
+                  htmlBadge.style.overflow = 'hidden'
+                  htmlBadge.style.display = 'flex'
+                  htmlBadge.style.alignItems = 'center'
+                  htmlBadge.style.justifyContent = 'center'
+                  // Ajustar posición del número dentro del badge
+                  const span = htmlBadge.querySelector('span') as HTMLElement
+                  if (span) {
+                    span.style.transform = 'translateY(-10px)'
+                  }
+                }
+              })
+            }
+          })
+          
+          // Restaurar estilos
+          deckViewRef.current.style.visibility = 'hidden'
+          deckViewRef.current.style.position = 'absolute'
+          deckViewRef.current.style.left = '-9999px'
+          
+          // Convertir a blob con mayor compresión para reducir tamaño
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob)
+              const link = document.createElement('a')
+              link.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_${activeTab}.jpg`
+              link.href = url
+              link.click()
+              URL.revokeObjectURL(url)
+            }
+            setExporting(false)
+          }, 'image/jpeg', 0.80)
+          
+          return
+        } catch (safariError) {
+          console.error('Error en método alternativo Safari/iOS:', safariError)
+          setExporting(false)
+          alert('Error al exportar la imagen en Safari/iOS. Por favor, intenta desde un navegador de escritorio.')
+          return
+        }
+      }
+      
+      // Método cliente (html2canvas) para navegadores de escritorio
+      if (!deckViewRef.current) return
+      
       // Guardar estilos originales del contenedor de exportación
       const originalVisibility = deckViewRef.current.style.visibility
       const originalPosition = deckViewRef.current.style.position
@@ -364,21 +499,25 @@ export default function DeckViewPage() {
                   }
                 }
                 
-                // Asegurar que los badges de cantidad tengan estilos correctos para exportación
-                if (htmlEl.classList.contains('rounded-full') && htmlEl.style.display === 'flex') {
-                  // Para exportación, posicionar el número arriba en lugar de centrado
+                // Asegurar que los badges de cantidad sean perfectamente circulares
+                if (htmlEl.classList.contains('rounded-full') && htmlEl.classList.contains('w-12') && htmlEl.classList.contains('h-12')) {
+                  htmlEl.style.borderRadius = '50%'
+                  htmlEl.style.width = '48px'
+                  htmlEl.style.height = '48px'
+                  htmlEl.style.minWidth = '48px'
+                  htmlEl.style.minHeight = '48px'
+                  htmlEl.style.overflow = 'hidden'
                   htmlEl.style.display = 'flex'
-                  htmlEl.style.alignItems = 'flex-start'
+                  htmlEl.style.alignItems = 'center'
                   htmlEl.style.justifyContent = 'center'
-                  htmlEl.style.paddingTop = '-10px'
                   const span = htmlEl.querySelector('span') as HTMLElement
                   if (span) {
-                    // Posicionar el número más arriba
                     span.style.display = 'inline-block'
                     span.style.margin = '0'
                     span.style.padding = '0'
                     span.style.lineHeight = '1'
-                    span.style.verticalAlign = 'top'
+                    span.style.verticalAlign = 'middle'
+                    span.style.transform = 'translateY(-10px)'
                   }
                 }
                 
@@ -676,7 +815,13 @@ export default function DeckViewPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      lineHeight: '0'
+                      lineHeight: '0',
+                      borderRadius: '50%',
+                      width: '48px',
+                      height: '48px',
+                      minWidth: '48px',
+                      minHeight: '48px',
+                      overflow: 'hidden'
                     }}
                   >
                     <span 
@@ -686,7 +831,8 @@ export default function DeckViewPage() {
                         lineHeight: '1',
                         margin: '0',
                         padding: '0',
-                        verticalAlign: 'middle'
+                        verticalAlign: 'middle',
+                        transform: 'translateY(-2px)'
                       }}
                     >
                       {entry.quantity}
