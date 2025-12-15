@@ -56,13 +56,13 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
       </div>
 
       <div className="flex flex-col flex-grow space-y-2">
-        <h3 className="font-bold text-lg text-[#F4C430] line-clamp-2 min-h-[3.5rem]">{card.name}</h3>
+        <h3 className="font-bold text-sm sm:text-base md:text-lg text-[#F4C430] line-clamp-2 leading-tight">{card.name}</h3>
 
-        <div className="flex justify-between items-center text-sm flex-shrink-0">
-          <span className={`px-2 py-1 rounded capitalize ${getTypeColor(card.type)}`}>
+        <div className="flex justify-between items-center gap-1 sm:gap-2 flex-shrink-0 flex-wrap">
+          <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-xs sm:text-sm capitalize whitespace-nowrap ${getTypeColor(card.type)}`}>
             {CARD_TYPE_LABELS[card.type]}
           </span>
-          <span className={`px-2 py-1 rounded capitalize ${getRarityColor(card.rarity)}`}>
+          <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-xs sm:text-sm capitalize whitespace-nowrap ${getRarityColor(card.rarity)}`}>
             {RARITY_TYPE_LABELS[card.rarity]}
           </span>
         </div>

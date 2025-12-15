@@ -127,7 +127,7 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
           {/* Columna izquierda - Imagen grande */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-8">
-              <div className="bg-[#121825] rounded-xl shadow-lg border-2 border-[#2D9B96] overflow-hidden border-mystic">
+              <div className="bg-[#121825] rounded-[40px] shadow-lg border-2 border-[#2D9B96] overflow-hidden border-mystic">
                 {(() => {
                   const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
                   return imageUrl ? (
