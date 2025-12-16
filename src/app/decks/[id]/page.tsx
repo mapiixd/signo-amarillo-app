@@ -40,6 +40,7 @@ export default function DeckViewPage() {
   const [currentHand, setCurrentHand] = useState<(CardType & { quantity: number })[]>([])
   const [handSize, setHandSize] = useState(8)
   const [excludedInitialGold, setExcludedInitialGold] = useState<string | null>(null)
+  const [selectedCardForView, setSelectedCardForView] = useState<CardType | null>(null)
   
   const fromCommunity = searchParams.get('from') === 'community'
 
@@ -962,7 +963,8 @@ export default function DeckViewPage() {
             return (
               <div
                 key={entry.card_id}
-                className="relative group"
+                className="relative group cursor-pointer"
+                onClick={() => setSelectedCardForView(entry.card)}
               >
                 {/* Carta */}
                 <div className="relative rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 border-2 border-[#2D9B96] hover:border-[#4ECDC4]">
@@ -1083,7 +1085,8 @@ export default function DeckViewPage() {
                     return (
                       <div
                         key={`hand-${card.id}-${index}`}
-                        className="relative group"
+                        className="relative group cursor-pointer"
+                        onClick={() => setSelectedCardForView(card)}
                       >
                         <div className="relative rounded overflow-hidden shadow-md hover:shadow-xl transition-all transform hover:scale-110 border border-[#2D9B96] hover:border-[#4ECDC4]">
                           {imageUrl ? (
@@ -1189,6 +1192,125 @@ export default function DeckViewPage() {
                 <button
                   onClick={() => setShowHandTestModal(false)}
                   className="px-4 py-2 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg text-sm"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para ver detalles de la carta */}
+      {selectedCardForView && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedCardForView(null)}
+        >
+          <div 
+            className="bg-[#121825] border-2 border-[#2D9B96] rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="sticky top-0 bg-[#121825] border-b border-[#2D9B96] p-3 sm:p-4 flex justify-between items-center gap-2 z-10">
+              <h2 className="text-base sm:text-xl lg:text-2xl font-bold text-[#F4C430] truncate flex-1 min-w-0">
+                {selectedCardForView.name}
+              </h2>
+              <button
+                onClick={() => setSelectedCardForView(null)}
+                className="text-[#4ECDC4] hover:text-[#F4C430] text-xl sm:text-2xl font-bold w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg hover:bg-[#1A2332] transition-colors flex-shrink-0"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Contenido del modal */}
+            <div className="p-4 sm:p-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Imagen de la carta */}
+                <div className="flex justify-center">
+                  <div className="w-full max-w-md">
+                    {(() => {
+                      const imagePath = selectedCardForView.image_url || selectedCardForView.image_file
+                      const imageUrl = imagePath ? getCardImageUrl(imagePath, selectedCardForView.expansion) : null
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={selectedCardForView.name}
+                          className="w-full h-auto rounded-lg border-2 border-[#2D9B96] shadow-lg"
+                        />
+                      ) : (
+                        <div className="aspect-[3/4] bg-[#1A2332] rounded-lg border-2 border-[#2D9B96] flex items-center justify-center">
+                          <span className="text-[#4ECDC4]">Sin imagen</span>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+
+                {/* Información de la carta */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Tipo</label>
+                    <span className="inline-block px-3 py-1 rounded-lg bg-[#2D9B96] text-white text-sm">
+                      {CARD_TYPE_LABELS[selectedCardForView.type as keyof typeof CARD_TYPE_LABELS] || selectedCardForView.type}
+                    </span>
+                  </div>
+
+                  {selectedCardForView.cost !== null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Coste</label>
+                      <div className="text-2xl font-bold text-[#F4C430]">{selectedCardForView.cost}</div>
+                    </div>
+                  )}
+
+                  {selectedCardForView.attack !== null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Fuerza</label>
+                      <div className="text-2xl font-bold text-[#E74860]">{selectedCardForView.attack}</div>
+                    </div>
+                  )}
+
+                  {selectedCardForView.defense !== null && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Defensa</label>
+                      <div className="text-2xl font-bold text-[#4ECDC4]">{selectedCardForView.defense}</div>
+                    </div>
+                  )}
+
+                  {selectedCardForView.race && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Raza</label>
+                      <div className="text-lg text-[#E8E8E8]">{selectedCardForView.race}</div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Expansión</label>
+                    <div className="text-sm text-[#E8E8E8]">{selectedCardForView.expansion}</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Rareza</label>
+                    <span className="inline-block px-3 py-1 rounded-lg bg-[#2D9B96] text-white text-sm">
+                      {RARITY_TYPE_LABELS[selectedCardForView.rarity as keyof typeof RARITY_TYPE_LABELS] || selectedCardForView.rarity}
+                    </span>
+                  </div>
+
+                  {selectedCardForView.description && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Habilidad</label>
+                      <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{selectedCardForView.description}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botón de cerrar */}
+              <div className="pt-4 mt-6 border-t border-[#2D9B96]">
+                <button
+                  onClick={() => setSelectedCardForView(null)}
+                  className="w-full px-6 py-3 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg"
                 >
                   Cerrar
                 </button>

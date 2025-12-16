@@ -258,8 +258,8 @@ function NewDeckPageContent() {
         const format = 'Imperio Racial' as FormatType
         const cache: Record<string, { status: BanStatus; maxCopies: number } | null> = {}
         
-        // Cargar todas las banlists desde la API una sola vez
-        const response = await fetch('/api/admin/banlist')
+        // Cargar todas las banlists desde la API una sola vez (ruta pública)
+        const response = await fetch('/api/cards/banlist/entries')
         if (!response.ok) {
           console.error('Error fetching banlist from API')
           return
@@ -1265,7 +1265,7 @@ function NewDeckPageContent() {
                   {selectedCardForView.description && (
                     <div>
                       <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Habilidad</label>
-                      <p className="text-[#A0A0A0] text-sm leading-relaxed">{selectedCardForView.description}</p>
+                      <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{selectedCardForView.description}</p>
                     </div>
                   )}
 

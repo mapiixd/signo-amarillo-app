@@ -29,7 +29,7 @@ export default function BanlistPage() {
   useEffect(() => {
     const loadBanlists = async () => {
       try {
-        const response = await fetch('/api/admin/banlist')
+        const response = await fetch('/api/cards/banlist/entries')
         if (response.ok) {
           const data = await response.json()
           const entries: BanlistEntry[] = data.entries || []
