@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Swal from 'sweetalert2'
-import { Card as CardType, CARD_TYPE_LABELS } from '@/types'
+import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
-import { getCardBanStatus, isCardBanned, getMaxCopies, getBanStatusIcon, getBanStatusLabel, type FormatType, type BanStatus } from '@/lib/banlist'
+import { getBanStatusIcon, getBanStatusLabel, type FormatType, type BanStatus } from '@/lib/banlist'
 import Footer from '@/components/Footer'
 
 interface SelectedCard {
@@ -254,21 +254,44 @@ function NewDeckPageContent() {
     const loadBanlistForCards = async () => {
       if (cards.length === 0) return
       
-      const format = 'Imperio Racial' as FormatType
-      const cache: Record<string, { status: BanStatus; maxCopies: number } | null> = {}
-      
-      // Cargar banlist para todas las cartas
-      const promises = cards.map(async (card) => {
-        const status = await getCardBanStatus(card.name, format)
-        return { name: card.name, status }
-      })
-      
-      const results = await Promise.all(promises)
-      results.forEach(({ name, status }) => {
-        cache[name] = status
-      })
-      
-      setBanlistCache(cache)
+      try {
+        const format = 'Imperio Racial' as FormatType
+        const cache: Record<string, { status: BanStatus; maxCopies: number } | null> = {}
+        
+        // Cargar todas las banlists desde la API una sola vez
+        const response = await fetch('/api/admin/banlist')
+        if (!response.ok) {
+          console.error('Error fetching banlist from API')
+          return
+        }
+        
+        const data = await response.json()
+        const entries: any[] = data.entries || []
+        
+        // Crear un mapa de banlist por nombre de carta (normalizado) para el formato específico
+        const banlistMap = new Map<string, { status: BanStatus; maxCopies: number }>()
+        
+        entries.forEach((entry: any) => {
+          if (entry.format === format) {
+            const normalizedName = entry.card_name.trim().toLowerCase()
+            banlistMap.set(normalizedName, {
+              status: entry.status as BanStatus,
+              maxCopies: entry.max_copies
+            })
+          }
+        })
+        
+        // Mapear cada carta a su estado de banlist
+        cards.forEach(card => {
+          const normalizedName = card.name.trim().toLowerCase()
+          const banlistEntry = banlistMap.get(normalizedName)
+          cache[card.name] = banlistEntry || null
+        })
+        
+        setBanlistCache(cache)
+      } catch (error) {
+        console.error('Error loading banlist:', error)
+      }
     }
     
     loadBanlistForCards()
@@ -328,9 +351,9 @@ function NewDeckPageContent() {
     const currentDeck = toSideboard ? sideboard : selectedCards
     const setDeck = toSideboard ? setSideboard : setSelectedCards
     
-    // Buscar por nombre normalizado (case-insensitive) para agrupar todas las versiones de la misma carta
-    const normalizedCardName = card.name.trim().toLowerCase()
-    const existing = currentDeck.find(sc => sc.card.name.trim().toLowerCase() === normalizedCardName)
+    // Buscar por ID específico de la carta (cada versión es independiente)
+    const existing = currentDeck.find(sc => sc.card.id === card.id)
+    // Para validaciones de banlist, contar por nombre (todas las versiones cuentan)
     const totalInBothDecks = getTotalCopiesByName(card.name)
     
     // Calcular el total de cartas en el mazo actual
@@ -361,23 +384,21 @@ function NewDeckPageContent() {
       return
     }
     
-    // Validar si la carta está prohibida en el formato
+    // Validar si la carta está prohibida en el formato (usar cache)
     const format = 'Imperio Racial' as FormatType
-    try {
-      const isBanned = await isCardBanned(card.name, format)
-      if (isBanned) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Carta Prohibida',
-          text: `${card.name} está PROHIBIDA en el formato ${format}`,
-          confirmButtonColor: '#2D9B96',
-          background: '#121825',
-          color: '#F4C430'
-        })
-        return
-      }
-    } catch (error) {
-      console.error('Error checking if card is banned:', error)
+    const banStatus = banlistCache[card.name] || null
+    const isBanned = banStatus?.status === 'banned'
+    
+    if (isBanned) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Carta Prohibida',
+        text: `${card.name} está PROHIBIDA en el formato ${format}`,
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      return
     }
     
     // Validar cartas únicas (que contengan "Única." en su descripción)
@@ -395,24 +416,20 @@ function NewDeckPageContent() {
     }
     
     // Validar límite de copias según banlist (puede ser 1, 2 o 3)
-    try {
-      const maxAllowed = await getMaxCopies(card.name, format)
-      if (totalInBothDecks >= maxAllowed) {
-        const banStatus = await getCardBanStatus(card.name, format)
-        const statusText = banStatus ? getBanStatusLabel(banStatus.status, banStatus.maxCopies) : ''
-        
-        Swal.fire({
-          icon: 'warning',
-          title: 'Límite alcanzado',
-          text: `No puedes tener más de ${maxAllowed} ${maxAllowed === 1 ? 'copia' : 'copias'} de ${card.name}${statusText ? ` (${statusText})` : ''}`,
-          confirmButtonColor: '#2D9B96',
-          background: '#121825',
-          color: '#F4C430'
-        })
-        return
-      }
-    } catch (error) {
-      console.error('Error checking card limits:', error)
+    // IMPORTANTE: Las restricciones de banlist se aplican por nombre, no por versión específica
+    const maxAllowed = banStatus?.maxCopies ?? 3
+    if (totalInBothDecks >= maxAllowed) {
+      const statusText = banStatus ? getBanStatusLabel(banStatus.status, banStatus.maxCopies) : ''
+      
+      Swal.fire({
+        icon: 'warning',
+        title: 'Límite alcanzado',
+        text: `No puedes tener más de ${maxAllowed} ${maxAllowed === 1 ? 'copia' : 'copias'} de ${card.name}${statusText ? ` (${statusText})` : ''}`,
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      return
     }
     
     // Validar máximo 4 aliados sin raza en el mazo principal
@@ -438,9 +455,9 @@ function NewDeckPageContent() {
     }
     
     if (existing) {
-      // Si ya existe una versión de esta carta (por nombre), incrementar su cantidad
+      // Si ya existe esta versión específica (por ID), incrementar su cantidad
       setDeck(currentDeck.map(sc => 
-        sc.card.name.trim().toLowerCase() === normalizedCardName ? { ...sc, quantity: sc.quantity + 1 } : sc
+        sc.card.id === card.id ? { ...sc, quantity: sc.quantity + 1 } : sc
       ))
     } else {
       setDeck([...currentDeck, { card, quantity: 1 }])
@@ -812,7 +829,10 @@ function NewDeckPageContent() {
             <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2 py-4 px-2 custom-scrollbar">
               {filteredCards.map(card => {
                 const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
-                const totalCopies = getTotalCopiesByName(card.name)
+                // Contar copias de esta versión específica (por ID) en el mazo
+                const totalCopiesThisVersion = getTotalCopies(card.id)
+                // Contar todas las copias por nombre (para mostrar límites de banlist)
+                const totalCopiesByName = getTotalCopiesByName(card.name)
                 const format = 'Imperio Racial' as FormatType
                 const banStatus = banlistCache[card.name] || null
                 const isBanned = banStatus?.status === 'banned'
@@ -865,10 +885,10 @@ function NewDeckPageContent() {
                       </div>
                     )}
                     
-                    {/* Badge de cantidad total (principal + refuerzo) */}
-                    {totalCopies > 0 && (
+                    {/* Badge de cantidad total de esta versión específica (principal + refuerzo) */}
+                    {totalCopiesThisVersion > 0 && (
                       <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-[#F4C430] text-[#0A0E1A] rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm shadow-lg border-2 border-[#2D9B96] z-20">
-                        {totalCopies}
+                        {totalCopiesThisVersion}
                       </div>
                     )}
 
@@ -884,6 +904,10 @@ function NewDeckPageContent() {
                         {!isUniqueCard && banStatus && banStatus.maxCopies < 3 && !isBanned && (
                           <span className="ml-1 text-yellow-400">({banStatus.maxCopies})</span>
                         )}
+                      </p>
+                      {/* Mostrar rareza */}
+                      <p className="text-[9px] sm:text-[10px] text-center text-[#A0A0A0] px-1">
+                        {RARITY_TYPE_LABELS[card.rarity as keyof typeof RARITY_TYPE_LABELS] || card.rarity}
                       </p>
                       <div className="flex gap-1">
                         <button
@@ -1040,6 +1064,8 @@ function NewDeckPageContent() {
                             <p className="text-[#A0A0A0] text-xs">
                               {CARD_TYPE_LABELS[sc.card.type as keyof typeof CARD_TYPE_LABELS]}
                               {sc.card.race && ` - ${sc.card.race}`}
+                              {' • '}
+                              {RARITY_TYPE_LABELS[sc.card.rarity as keyof typeof RARITY_TYPE_LABELS] || sc.card.rarity}
                             </p>
                           </div>
 
@@ -1227,6 +1253,13 @@ function NewDeckPageContent() {
                   <div>
                     <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Expansión</label>
                     <div className="text-sm text-[#E8E8E8]">{selectedCardForView.expansion}</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4ECDC4] mb-1">Rareza</label>
+                    <span className="inline-block px-3 py-1 rounded-lg bg-[#2D9B96] text-white text-sm">
+                      {RARITY_TYPE_LABELS[selectedCardForView.rarity as keyof typeof RARITY_TYPE_LABELS] || selectedCardForView.rarity}
+                    </span>
                   </div>
 
                   {selectedCardForView.description && (

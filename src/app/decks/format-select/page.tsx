@@ -21,7 +21,7 @@ export default function FormatSelectPage() {
     { name: 'Caballero', image: '/razas/Caballero.png' },
     { name: 'Dragón', image: '/razas/Dragón.png' },
     { name: 'Eterno', image: '/razas/Eterno.png' },
-    { name: 'Faerie', image: '/razas/Fairie.png' },
+    { name: 'Faerie', image: '/razas/Faerie.png' },
     { name: 'Guerrero', image: '/razas/Guerrero.png' },
     { name: 'Héroe', image: '/razas/Héroe.png' },
     { name: 'Sacerdote', image: '/razas/Sacerdote.png' },

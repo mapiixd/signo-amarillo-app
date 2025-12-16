@@ -41,7 +41,7 @@ export default function CardsPage() {
     'Sacerdote',
     'Caballero',
     'Guerrero',
-    'Fairie',
+    'Faerie',
     'Eterno',
     'Bestia',
     'Dragón',

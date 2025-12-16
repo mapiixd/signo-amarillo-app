@@ -36,6 +36,10 @@ export default function DeckViewPage() {
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
   const deckViewRef = useRef<HTMLDivElement>(null)
+  const [showHandTestModal, setShowHandTestModal] = useState(false)
+  const [currentHand, setCurrentHand] = useState<(CardType & { quantity: number })[]>([])
+  const [handSize, setHandSize] = useState(8)
+  const [excludedInitialGold, setExcludedInitialGold] = useState<string | null>(null)
   
   const fromCommunity = searchParams.get('from') === 'community'
 
@@ -233,6 +237,89 @@ export default function DeckViewPage() {
   const cardsToDisplay = activeTab === 'main' 
     ? sortCards(deck.cards) 
     : sortCards(deck.sideboard)
+
+  // Función para obtener los oros iniciales del mazo
+  const getInitialGolds = () => {
+    if (!deck) return []
+    return deck.cards
+      .filter(entry => 
+        entry.card.type === 'ORO' && 
+        entry.card.description && 
+        entry.card.description.startsWith('Oro Inicial.')
+      )
+      .map(entry => entry.card)
+  }
+
+  // Función para generar una mano aleatoria
+  const generateRandomHand = (size: number = 8) => {
+    if (!deck || deck.cards.length === 0) return []
+
+    // Crear un pool de cartas considerando las cantidades
+    const cardPool: (CardType & { quantity: number })[] = []
+    deck.cards.forEach(entry => {
+      // Excluir el oro inicial seleccionado si existe
+      if (excludedInitialGold && entry.card.id === excludedInitialGold) {
+        return
+      }
+      
+      for (let i = 0; i < entry.quantity; i++) {
+        cardPool.push({ ...entry.card, quantity: 1 })
+      }
+    })
+
+    // Si el pool es menor que el tamaño solicitado, usar todas las cartas disponibles
+    if (cardPool.length < size) {
+      return cardPool
+    }
+
+    // Seleccionar cartas aleatorias sin repetición
+    const shuffled = [...cardPool].sort(() => Math.random() - 0.5)
+    return shuffled.slice(0, size)
+  }
+
+  // Función para abrir el modal de probar manos
+  const handleOpenHandTest = () => {
+    const initialGolds = getInitialGolds()
+    // Si hay un solo oro inicial, excluirlo automáticamente
+    if (initialGolds.length === 1) {
+      setExcludedInitialGold(initialGolds[0].id)
+    } else if (initialGolds.length > 1) {
+      // Si hay múltiples, seleccionar el primero por defecto si no hay uno ya seleccionado
+      if (!excludedInitialGold || !initialGolds.find(g => g.id === excludedInitialGold)) {
+        setExcludedInitialGold(initialGolds[0].id)
+      }
+    }
+    
+    const newHand = generateRandomHand(8)
+    setCurrentHand(newHand)
+    setHandSize(8)
+    setShowHandTestModal(true)
+  }
+
+  // Función para probar otra mano
+  const handleNewHand = () => {
+    const newHand = generateRandomHand(8)
+    setCurrentHand(newHand)
+    setHandSize(8)
+  }
+
+  // Función para hacer mulligan
+  const handleMulligan = () => {
+    if (handSize > 1) {
+      const newSize = handSize - 1
+      const newHand = generateRandomHand(newSize)
+      setCurrentHand(newHand)
+      setHandSize(newSize)
+    }
+  }
+
+  // Función para manejar el cambio de oro excluido
+  const handleExcludedGoldChange = (goldId: string) => {
+    setExcludedInitialGold(goldId)
+    // Regenerar la mano con el nuevo oro excluido
+    const newHand = generateRandomHand(handSize)
+    setCurrentHand(newHand)
+  }
 
   const handleExportImage = async () => {
     if (!deck) return
@@ -641,6 +728,12 @@ export default function DeckViewPage() {
 
                 <div className="flex gap-3">
                   <button
+                    onClick={handleOpenHandTest}
+                    className="px-5 py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg"
+                  >
+                    🎴 Probar Mano
+                  </button>
+                  <button
                     onClick={handleExportImage}
                     disabled={exporting}
                     className="px-5 py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -960,6 +1053,150 @@ export default function DeckViewPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Probar Manos */}
+      {showHandTestModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0F1419] border-2 border-[#2D9B96] rounded-xl max-w-6xl w-full">
+            {/* Header del Modal */}
+            <div className="bg-[#0F1419] border-b border-[#2D9B96] px-4 py-3 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[#F4C430]">
+                Probar Mano ({currentHand.length} cartas)
+              </h2>
+              <button
+                onClick={() => setShowHandTestModal(false)}
+                className="text-[#4ECDC4] hover:text-white transition-colors text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-4">
+              {/* Grid de Cartas */}
+              {currentHand.length > 0 ? (
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 mb-4">
+                  {currentHand.map((card, index) => {
+                    const imagePath = card.image_url || card.image_file
+                    const imageUrl = imagePath ? getCardImageUrl(imagePath, card.expansion) : null
+
+                    return (
+                      <div
+                        key={`hand-${card.id}-${index}`}
+                        className="relative group"
+                      >
+                        <div className="relative rounded overflow-hidden shadow-md hover:shadow-xl transition-all transform hover:scale-110 border border-[#2D9B96] hover:border-[#4ECDC4]">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={card.name}
+                              className="w-full h-auto object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                                const parent = e.currentTarget.parentElement
+                                if (parent && !parent.querySelector('.image-error-placeholder')) {
+                                  const placeholder = document.createElement('div')
+                                  placeholder.className = 'image-error-placeholder w-full aspect-[2.5/3.5] bg-[#1A2332] flex items-center justify-center border border-[#2D9B96]'
+                                  placeholder.innerHTML = '<span class="text-[8px] text-[#4ECDC4] text-center px-1">Sin imagen</span>'
+                                  parent.appendChild(placeholder)
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full aspect-[2.5/3.5] bg-[#1A2332] flex items-center justify-center border border-[#2D9B96]">
+                              <span className="text-[8px] text-[#4ECDC4] text-center px-1">Sin imagen</span>
+                            </div>
+                          )}
+
+                          {/* Overlay con nombre en hover */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
+                            <div className="p-1.5 w-full">
+                              <p className="text-white font-bold text-[10px] leading-tight line-clamp-2">
+                                {card.name}
+                              </p>
+                              <p className="text-[#4ECDC4] text-[8px] mt-0.5">
+                                {CARD_TYPE_LABELS[card.type as keyof typeof CARD_TYPE_LABELS] || card.type}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-[#0F1419] border border-[#2D9B96] rounded-xl mb-4">
+                  <div className="text-4xl mb-2">🎴</div>
+                  <p className="text-[#A0A0A0] text-sm">
+                    No hay suficientes cartas en el mazo para generar una mano
+                  </p>
+                </div>
+              )}
+
+              {/* Selector de Oro Inicial a Excluir */}
+              {(() => {
+                const initialGolds = getInitialGolds()
+                if (initialGolds.length > 1) {
+                  // Asegurar que siempre haya un oro seleccionado (usar el primero si no hay ninguno)
+                  const selectedGold = excludedInitialGold || initialGolds[0].id
+                  
+                  return (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-[#4ECDC4] mb-2">
+                        Oro Inicial a excluir del mulligan:
+                      </label>
+                      <select
+                        value={selectedGold}
+                        onChange={(e) => handleExcludedGoldChange(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#1A2332] border border-[#2D9B96] rounded-lg text-[#F4C430] focus:outline-none focus:border-[#4ECDC4] text-sm"
+                      >
+                        {initialGolds.map((gold) => (
+                          <option key={gold.id} value={gold.id}>
+                            {gold.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                } else if (initialGolds.length === 1 && excludedInitialGold) {
+                  return (
+                    <div className="mb-4 p-3 bg-[#1A2332] border border-[#2D9B96] rounded-lg">
+                      <p className="text-xs text-[#4ECDC4]">
+                        ℹ️ El oro inicial <span className="text-[#F4C430] font-semibold">{initialGolds[0].name}</span> está excluido automáticamente del mulligan.
+                      </p>
+                    </div>
+                  )
+                }
+                return null
+              })()}
+
+              {/* Botones de Acción */}
+              <div className="flex flex-wrap gap-2 justify-center">
+                <button
+                  onClick={handleNewHand}
+                  className="px-4 py-2 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-colors font-medium shadow-lg text-sm"
+                >
+                  🎲 Probar Otra Mano
+                </button>
+                <button
+                  onClick={handleMulligan}
+                  disabled={handSize <= 1}
+                  className="px-4 py-2 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {handSize > 1 ? `🔄 Mulligan a ${handSize - 1}` : '🔄 Mulligan (mínimo)'}
+                </button>
+                <button
+                  onClick={() => setShowHandTestModal(false)}
+                  className="px-4 py-2 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg text-sm"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

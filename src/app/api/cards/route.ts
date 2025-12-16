@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Filtrar duplicados
-    // En el editor de mazos (rotation=true): agrupar solo por nombre para evitar múltiples versiones
+    // En el editor de mazos (rotation=true): mostrar TODAS las versiones (agrupar por ID único)
     // En el visor de cartas: agrupar por nombre+expansión para mostrar todas las versiones
     const cardsByKey = new Map<string, any>()
     
@@ -208,9 +208,14 @@ export async function GET(request: NextRequest) {
     sortedCards?.forEach(card => {
       // Normalizar el nombre para la comparación (case-insensitive, sin espacios extra)
       const normalizedName = card.name.trim().toLowerCase()
-      const key = groupByExpansion 
-        ? `${normalizedName}|${card.expansion}` 
-        : normalizedName // Solo por nombre en el editor de mazos
+      
+      // En el editor de mazos (rotation=true), usar ID único para mostrar todas las versiones
+      // En el visor de cartas, agrupar por nombre+expansión
+      const key = rotation === 'true'
+        ? card.id // Usar ID único para mostrar todas las versiones en el editor
+        : (groupByExpansion 
+          ? `${normalizedName}|${card.expansion}` 
+          : normalizedName)
       
       const currentRarityOrder = rarityOrder[card.rarity] ?? 999
       
@@ -218,31 +223,78 @@ export async function GET(request: NextRequest) {
         // Primera vez que vemos esta carta
         cardsByKey.set(key, card)
       } else {
-        // Ya existe una versión de esta carta
-        const existingCard = cardsByKey.get(key)!
-        const existingRarityOrder = rarityOrder[existingCard.rarity] ?? 999
-        
-        // Mantener la carta con mayor rarezaOrder (menor rareza = rareza base)
-        // Si la nueva carta tiene mayor rarezaOrder, reemplazar
-        if (currentRarityOrder > existingRarityOrder) {
-          cardsByKey.set(key, card)
-        }
-        // Si tienen el mismo rarezaOrder pero la existente es una rareza especial, reemplazar
-        else if (currentRarityOrder === existingRarityOrder) {
-          const existingIsSpecial = specialRarities.includes(existingCard.rarity)
-          const currentIsSpecial = specialRarities.includes(card.rarity)
+        // Solo aplicar lógica de agrupación si no estamos en modo "mostrar todas las versiones"
+        if (rotation !== 'true') {
+          // Ya existe una versión de esta carta
+          const existingCard = cardsByKey.get(key)!
+          const existingRarityOrder = rarityOrder[existingCard.rarity] ?? 999
           
-          // Si la existente es especial y la nueva no, reemplazar
-          if (existingIsSpecial && !currentIsSpecial) {
+          // Mantener la carta con mayor rarezaOrder (menor rareza = rareza base)
+          // Si la nueva carta tiene mayor rarezaOrder, reemplazar
+          if (currentRarityOrder > existingRarityOrder) {
             cardsByKey.set(key, card)
           }
-          // Si ambas son especiales o ambas no, mantener la existente (ya está ordenada)
+          // Si tienen el mismo rarezaOrder pero la existente es una rareza especial, reemplazar
+          else if (currentRarityOrder === existingRarityOrder) {
+            const existingIsSpecial = specialRarities.includes(existingCard.rarity)
+            const currentIsSpecial = specialRarities.includes(card.rarity)
+            
+            // Si la existente es especial y la nueva no, reemplazar
+            if (existingIsSpecial && !currentIsSpecial) {
+              cardsByKey.set(key, card)
+            }
+            // Si ambas son especiales o ambas no, mantener la existente (ya está ordenada)
+          }
         }
+        // Si rotation=true, no hacer nada (ya está en el map con su ID único)
       }
     })
     
     // Convertir el Map a array
     let filteredCards = Array.from(cardsByKey.values())
+
+    // Filtrar duplicados entre expansiones específicas
+    // Si una carta tiene versiones en ambas expansiones de un par, mantener solo una
+    if (rotation === 'true') {
+      const cardsByName = new Map<string, any[]>()
+      
+      // Agrupar cartas por nombre
+      filteredCards.forEach(card => {
+        const normalizedName = card.name.trim().toLowerCase()
+        if (!cardsByName.has(normalizedName)) {
+          cardsByName.set(normalizedName, [])
+        }
+        cardsByName.get(normalizedName)!.push(card)
+      })
+      
+      // Pares de expansiones donde solo queremos una versión
+      const expansionPairs = [
+        { older: 'Hielo Inmortal', newer: 'Cenizas de Fuego' },
+        { older: 'Amenaza Kaiju', newer: 'Escuadron Mecha' }
+      ]
+      
+      // Para cada grupo de cartas con el mismo nombre
+      const finalCards: any[] = []
+      cardsByName.forEach((cards, normalizedName) => {
+        let cardsToKeep = [...cards]
+        
+        // Aplicar filtros para cada par de expansiones
+        expansionPairs.forEach(pair => {
+          const olderVersions = cardsToKeep.filter(c => c.expansion === pair.older)
+          const newerVersions = cardsToKeep.filter(c => c.expansion === pair.newer)
+          
+          // Si tiene versiones en ambas expansiones, mantener solo las de la más reciente
+          if (olderVersions.length > 0 && newerVersions.length > 0) {
+            // Remover las versiones de la expansión más antigua
+            cardsToKeep = cardsToKeep.filter(c => c.expansion !== pair.older)
+          }
+        })
+        
+        finalCards.push(...cardsToKeep)
+      })
+      
+      filteredCards = finalCards
+    }
 
     // Reordenar las cartas filtradas para mantener el orden correcto
     filteredCards = filteredCards.sort((a, b) => {
