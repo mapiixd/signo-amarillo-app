@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { DeckWithCards, Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
 import html2canvas from 'html2canvas'
 import Swal from 'sweetalert2'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DeckWithLikes extends DeckWithCards {
   likes_count?: number
@@ -42,6 +43,7 @@ export default function DeckViewPage() {
   const [handSize, setHandSize] = useState(8)
   const [excludedInitialGold, setExcludedInitialGold] = useState<string | null>(null)
   const [selectedCardForView, setSelectedCardForView] = useState<CardType | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   
   const fromCommunity = searchParams.get('from') === 'community'
 
@@ -56,6 +58,68 @@ export default function DeckViewPage() {
       checkLikeStatus()
     }
   }, [deck, fromCommunity])
+
+  // Función para preparar datos del gráfico de curva de costes
+  const prepareChartData = useMemo(() => {
+    if (!deck) return []
+
+    // Obtener cartas del mazo principal (no sidedeck) y excluir ORO
+    const cardsForChart = deck.cards.filter(entry => entry.card.type !== 'ORO')
+    
+    // Encontrar el coste máximo
+    const maxCost = Math.max(
+      ...cardsForChart.map(entry => entry.card.cost ?? 0),
+      0
+    )
+
+    // Crear estructura de datos por coste
+    const chartData: Array<{
+      coste: string
+      Aliado: number
+      Arma: number
+      Totem: number
+      Talismán: number
+    }> = []
+
+    // Inicializar todos los costes desde 0 hasta maxCost
+    for (let cost = 0; cost <= maxCost; cost++) {
+      chartData.push({
+        coste: cost.toString(),
+        Aliado: 0,
+        Arma: 0,
+        Totem: 0,
+        Talismán: 0
+      })
+    }
+
+    // Agrupar cartas por coste y tipo
+    cardsForChart.forEach(entry => {
+      const cost = entry.card.cost ?? 0
+      const type = entry.card.type
+      const quantity = entry.quantity
+
+      const dataPoint = chartData[cost]
+      if (dataPoint) {
+        switch (type) {
+          case 'ALIADO':
+            dataPoint.Aliado += quantity
+            break
+          case 'ARMA':
+            dataPoint.Arma += quantity
+            break
+          case 'TOTEM':
+            dataPoint.Totem += quantity
+            break
+          case 'TALISMAN':
+            dataPoint.Talismán += quantity
+            break
+        }
+      }
+    })
+
+    // Filtrar costes que no tienen cartas (opcional, o dejarlos en 0)
+    return chartData
+  }, [deck])
 
   const fetchDeck = async (id: string) => {
     try {
@@ -239,6 +303,38 @@ export default function DeckViewPage() {
   const cardsToDisplay = activeTab === 'main' 
     ? sortCards(deck.cards) 
     : sortCards(deck.sideboard)
+
+  // Función para agrupar cartas por tipo para la vista de tabla
+  const groupCardsByType = (cards: typeof deck.cards) => {
+    const grouped: Record<string, typeof deck.cards> = {
+      'ALIADO': [],
+      'ARMA': [],
+      'TOTEM': [],
+      'TALISMAN': [],
+      'ORO': []
+    }
+
+    cards.forEach(entry => {
+      const type = entry.card.type
+      if (grouped[type]) {
+        grouped[type].push(entry)
+      }
+    })
+
+    // Ordenar cada grupo por coste y luego por nombre
+    Object.keys(grouped).forEach(type => {
+      grouped[type].sort((a, b) => {
+        const costA = normalizeCost(a.card)
+        const costB = normalizeCost(b.card)
+        if (costA !== costB) return costA - costB
+        return a.card.name.localeCompare(b.card.name, 'es', { sensitivity: 'base' })
+      })
+    })
+
+    return grouped
+  }
+
+  const cardsByType = groupCardsByType(cardsToDisplay)
 
   // Función para obtener los oros iniciales del mazo
   const getInitialGolds = () => {
@@ -847,6 +943,34 @@ export default function DeckViewPage() {
               </button>
             </div>
           </div>
+
+          {/* Selector de modo de visualización */}
+          <div className="mt-4 flex justify-end">
+            <div className="flex gap-2 bg-[#0F1419] border border-[#2D9B96] rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-2 rounded-md transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-[#2D9B96] text-white'
+                    : 'text-[#A0A0A0] hover:text-[#4ECDC4]'
+                }`}
+                title="Vista de grid"
+              >
+                <i className="fas fa-th"></i>
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-2 rounded-md transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-[#2D9B96] text-white'
+                    : 'text-[#A0A0A0] hover:text-[#4ECDC4]'
+                }`}
+                title="Vista de tabla"
+              >
+                <i className="fas fa-bars"></i>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Contenedor para exportación que incluye header y cartas - oculto visualmente pero accesible para html2canvas */}
@@ -984,107 +1108,258 @@ export default function DeckViewPage() {
           )}
         </div>
 
-        {/* Grid de Cartas visible en la web */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-          {cardsToDisplay.map((entry) => {
-            // Verificar que la carta existe
-            if (!entry.card) {
-              console.error('Card not found for entry:', entry)
-              return null
-            }
-            
-            return (
-              <div
-                key={entry.card_id}
-                className="relative group cursor-pointer"
-                onClick={() => setSelectedCardForView(entry.card)}
-              >
-                {/* Carta */}
-                <div className="relative rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 border-2 border-[#2D9B96] hover:border-[#4ECDC4]">
-                  {(() => {
-                    // Priorizar image_url si existe, sino usar image_file
-                    const imagePath = entry.card.image_url || entry.card.image_file
-                    const imageUrl = imagePath ? getCardImageUrl(imagePath, entry.card.expansion) : null
-                    
-                    if (!imageUrl) {
-                      return (
-                        <div className="w-full aspect-[2.5/3.5] bg-[#1A2332] flex items-center justify-center border border-[#2D9B96]">
-                          <span className="text-xs text-[#4ECDC4] text-center px-2">Sin imagen</span>
-                        </div>
-                      )
-                    }
-                    
-                    return (
-                      <img
-                        src={imageUrl || ''}
-                        alt={entry.card.name}
-                        className="w-full h-auto object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          // Ocultar imagen si falla y mostrar placeholder visual
-                          e.currentTarget.style.display = 'none'
-                          const parent = e.currentTarget.parentElement
-                          if (parent && !parent.querySelector('.image-error-placeholder')) {
-                            const placeholder = document.createElement('div')
-                            placeholder.className = 'image-error-placeholder w-full aspect-[2.5/3.5] bg-[#1A2332] flex items-center justify-center border border-[#2D9B96]'
-                            placeholder.innerHTML = '<span class="text-xs text-[#4ECDC4] text-center px-2">Error cargando imagen</span>'
-                            parent.appendChild(placeholder)
-                          }
-                        }}
-                      />
-                    )
-                  })()}
-                  
-                  {/* Badge de cantidad */}
-                  <div 
-                    className="absolute bottom-1 right-2 bg-gradient-to-br from-[#0A0E1A] to-[#121825] border-2 border-[#F4C430] rounded-full w-12 h-12 shadow-lg"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      lineHeight: '0'
-                    }}
+        {/* Vista Grid o Tabla */}
+        {viewMode === 'grid' ? (
+          <>
+            {/* Grid de Cartas visible en la web */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+              {cardsToDisplay.map((entry) => {
+                // Verificar que la carta existe
+                if (!entry.card) {
+                  console.error('Card not found for entry:', entry)
+                  return null
+                }
+                
+                return (
+                  <div
+                    key={entry.card_id}
+                    className="relative group cursor-pointer"
+                    onClick={() => setSelectedCardForView(entry.card)}
                   >
-                    <span 
-                      className="text-xl font-bold text-[#F4C430]"
-                      style={{
-                        display: 'inline-block',
-                        lineHeight: '1',
-                        margin: '0',
-                        padding: '0',
-                        verticalAlign: 'middle'
-                      }}
-                    >
-                      {entry.quantity}
-                    </span>
-                  </div>
+                    {/* Carta */}
+                    <div className="relative rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 border-2 border-[#2D9B96] hover:border-[#4ECDC4]">
+                      {(() => {
+                        // Priorizar image_url si existe, sino usar image_file
+                        const imagePath = entry.card.image_url || entry.card.image_file
+                        const imageUrl = imagePath ? getCardImageUrl(imagePath, entry.card.expansion) : null
+                        
+                        if (!imageUrl) {
+                          return (
+                            <div className="w-full aspect-[2.5/3.5] bg-[#1A2332] flex items-center justify-center border border-[#2D9B96]">
+                              <span className="text-xs text-[#4ECDC4] text-center px-2">Sin imagen</span>
+                            </div>
+                          )
+                        }
+                        
+                        return (
+                          <img
+                            src={imageUrl || ''}
+                            alt={entry.card.name}
+                            className="w-full h-auto object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              // Ocultar imagen si falla y mostrar placeholder visual
+                              e.currentTarget.style.display = 'none'
+                              const parent = e.currentTarget.parentElement
+                              if (parent && !parent.querySelector('.image-error-placeholder')) {
+                                const placeholder = document.createElement('div')
+                                placeholder.className = 'image-error-placeholder w-full aspect-[2.5/3.5] bg-[#1A2332] flex items-center justify-center border border-[#2D9B96]'
+                                placeholder.innerHTML = '<span class="text-xs text-[#4ECDC4] text-center px-2">Error cargando imagen</span>'
+                                parent.appendChild(placeholder)
+                              }
+                            }}
+                          />
+                        )
+                      })()}
+                      
+                      {/* Badge de cantidad */}
+                      <div 
+                        className="absolute bottom-1 right-2 bg-gradient-to-br from-[#0A0E1A] to-[#121825] border-2 border-[#F4C430] rounded-full w-12 h-12 shadow-lg"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          lineHeight: '0'
+                        }}
+                      >
+                        <span 
+                          className="text-xl font-bold text-[#F4C430]"
+                          style={{
+                            display: 'inline-block',
+                            lineHeight: '1',
+                            margin: '0',
+                            padding: '0',
+                            verticalAlign: 'middle'
+                          }}
+                        >
+                          {entry.quantity}
+                        </span>
+                      </div>
 
-                  {/* Overlay con nombre en hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
-                    <div className="p-3 w-full">
-                      <p className="text-white font-bold text-sm line-clamp-2">
-                        {entry.card.name}
-                      </p>
-                      <p className="text-[#4ECDC4] text-xs mt-1">
-                        {CARD_TYPE_LABELS[entry.card.type as keyof typeof CARD_TYPE_LABELS] || entry.card.type} • {RARITY_TYPE_LABELS[entry.card.rarity as keyof typeof RARITY_TYPE_LABELS] || entry.card.rarity}
-                      </p>
+                      {/* Overlay con nombre en hover */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
+                        <div className="p-3 w-full">
+                          <p className="text-white font-bold text-sm line-clamp-2">
+                            {entry.card.name}
+                          </p>
+                          <p className="text-[#4ECDC4] text-xs mt-1">
+                            {CARD_TYPE_LABELS[entry.card.type as keyof typeof CARD_TYPE_LABELS] || entry.card.type} • {RARITY_TYPE_LABELS[entry.card.rarity as keyof typeof RARITY_TYPE_LABELS] || entry.card.rarity}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
 
-        {/* Mensaje si está vacío */}
-        {cardsToDisplay.length === 0 && (
-          <div className="text-center py-16 bg-[#0F1419] border border-[#2D9B96] rounded-xl">
-            <div className="text-6xl mb-4">🎴</div>
-            <p className="text-[#A0A0A0] text-lg">
-              {activeTab === 'main' 
-                ? 'No hay cartas en el mazo principal' 
-                : 'No hay cartas en el sidedeck'}
-            </p>
+            {/* Mensaje si está vacío */}
+            {cardsToDisplay.length === 0 && (
+              <div className="text-center py-16 bg-[#0F1419] border border-[#2D9B96] rounded-xl">
+                <div className="text-6xl mb-4">🎴</div>
+                <p className="text-[#A0A0A0] text-lg">
+                  {activeTab === 'main' 
+                    ? 'No hay cartas en el mazo principal' 
+                    : 'No hay cartas en el sidedeck'}
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Vista de Tabla */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(['ALIADO', 'ARMA', 'TOTEM', 'TALISMAN', 'ORO'] as const).map((type) => {
+                const cards = cardsByType[type]
+                if (cards.length === 0) return null
+
+                const typeLabel = CARD_TYPE_LABELS[type] || type
+                const totalQuantity = cards.reduce((sum, entry) => sum + entry.quantity, 0)
+                const isOro = type === 'ORO'
+
+                return (
+                  <div key={type} className="bg-[#0F1419] border border-[#2D9B96] rounded-xl overflow-hidden">
+                    {/* Header de la tabla por tipo */}
+                    <div className="bg-[#1A2332] border-b border-[#2D9B96] px-3 py-2">
+                      <h3 className="text-base font-bold text-[#F4C430]">
+                        {typeLabel} ({totalQuantity})
+                      </h3>
+                    </div>
+
+                    {/* Tabla */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-[#121825] border-b border-[#2D9B96]">
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-[#4ECDC4]">Cantidad</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold text-[#4ECDC4]">Nombre</th>
+                            {!isOro && (
+                              <th className="px-3 py-2 text-left text-xs font-semibold text-[#4ECDC4]">Coste</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cards.map((entry) => {
+                            if (!entry.card) return null
+
+                            return (
+                              <tr
+                                key={entry.card_id}
+                                className="border-b border-[#2D9B96]/50 hover:bg-[#1A2332]/50 cursor-pointer transition-colors"
+                                onClick={() => setSelectedCardForView(entry.card)}
+                              >
+                                <td className="px-3 py-2 text-[#F4C430] font-semibold text-sm">
+                                  {entry.quantity}
+                                </td>
+                                <td className="px-3 py-2 text-white text-sm">
+                                  {entry.card.name}
+                                </td>
+                                {!isOro && (
+                                  <td className="px-3 py-2 text-[#4ECDC4] text-sm">
+                                    {entry.card.cost !== null ? entry.card.cost : '-'}
+                                  </td>
+                                )}
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Mensaje si está vacío */}
+            {cardsToDisplay.length === 0 && (
+              <div className="text-center py-16 bg-[#0F1419] border border-[#2D9B96] rounded-xl">
+                <div className="text-6xl mb-4">🎴</div>
+                <p className="text-[#A0A0A0] text-lg">
+                  {activeTab === 'main' 
+                    ? 'No hay cartas en el mazo principal' 
+                    : 'No hay cartas en el sidedeck'}
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Gráfico de curva de costes */}
+        {activeTab === 'main' && prepareChartData.length > 0 && (
+          <div className="mt-6 bg-[#0F1419] border border-[#2D9B96] rounded-xl overflow-visible p-3 sm:p-4 md:p-6">
+            <h3 className="text-lg sm:text-xl font-bold text-[#F4C430] mb-3 sm:mb-4">Curva de Costes</h3>
+            <div className="w-full overflow-visible" style={{ minHeight: '250px' }}>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart
+                  data={prepareChartData}
+                  margin={{ 
+                    top: 10, 
+                    right: 10, 
+                    left: 0, 
+                    bottom: 40 
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2D9B96" opacity={0.3} />
+                  <XAxis 
+                    dataKey="coste" 
+                    stroke="#4ECDC4"
+                    tick={{ fill: '#4ECDC4', fontSize: 12 }}
+                    label={{ 
+                      value: 'Coste', 
+                      position: 'insideBottom', 
+                      offset: 0, 
+                      fill: '#4ECDC4',
+                      style: { fontSize: '12px' }
+                    }}
+                  />
+                  <YAxis 
+                    stroke="#4ECDC4"
+                    tick={{ fill: '#4ECDC4', fontSize: 12 }}
+                    label={{ 
+                      value: 'Cantidad', 
+                      angle: -90, 
+                      position: 'insideLeft', 
+                      fill: '#4ECDC4',
+                      style: { fontSize: '12px' }
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0F1419',
+                      border: '1px solid #2D9B96',
+                      borderRadius: '8px',
+                      color: '#F4C430',
+                      fontSize: '12px'
+                    }}
+                    itemStyle={{ color: '#4ECDC4', fontSize: '12px' }}
+                    labelStyle={{ color: '#F4C430', fontWeight: 'bold', fontSize: '12px' }}
+                    position={{ x: 0, y: 200 }}
+                    allowEscapeViewBox={{ x: true, y: true }}
+                    offset={10}
+                  />
+                  <Legend
+                    wrapperStyle={{ color: '#4ECDC4', fontSize: '12px', paddingTop: '10px' }}
+                    iconSize={12}
+                    verticalAlign="top"
+                    align="center"
+                  />
+                  <Bar dataKey="Aliado" stackId="a" fill="#2D9B96" />
+                  <Bar dataKey="Arma" stackId="a" fill="#B8384E" />
+                  <Bar dataKey="Totem" stackId="a" fill="#1A7F5A" />
+                  <Bar dataKey="Talismán" stackId="a" fill="#8B4789" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
       </div>
