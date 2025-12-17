@@ -33,6 +33,7 @@ export default function DeckViewPage() {
   }, [deck])
   const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
   const [exporting, setExporting] = useState(false)
+  const [exportOrientation, setExportOrientation] = useState<'vertical' | 'horizontal'>('vertical')
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
   const deckViewRef = useRef<HTMLDivElement>(null)
@@ -342,7 +343,8 @@ export default function DeckViewPage() {
             },
             body: JSON.stringify({
               activeTab: activeTab,
-              width: 1000
+              width: exportOrientation === 'horizontal' ? 1800 : 1000,
+              orientation: exportOrientation
             })
           })
           
@@ -375,7 +377,7 @@ export default function DeckViewPage() {
         
         try {
           // Configurar el contenedor con dimensiones más pequeñas para Safari/iOS
-          const exportWidth = 800 // Reducir ancho para Safari/iOS
+          const exportWidth = exportOrientation === 'horizontal' ? 1440 : 800 // Reducir ancho para Safari/iOS
           deckViewRef.current.style.position = 'absolute'
           deckViewRef.current.style.top = '0'
           deckViewRef.current.style.left = '-9999px'
@@ -397,7 +399,7 @@ export default function DeckViewPage() {
             useCORS: true,
             allowTaint: true,
             foreignObjectRendering: false,
-            width: exportWidth,
+            width: exportWidth, // Ancho según orientación
             windowHeight: deckViewRef.current.scrollHeight,
             onclone: (clonedDoc, element) => {
               // Ocultar botones y footer
@@ -476,8 +478,8 @@ export default function DeckViewPage() {
       
       // Mover el contenedor fuera de la pantalla pero mantenerlo accesible para html2canvas
       // Usamos posición fuera de la pantalla pero sin ocultarlo completamente para que html2canvas pueda capturarlo
-      // Ancho estándar para exportación consistente en todos los dispositivos
-      const exportWidth = 1000 // Ancho estándar para exportación
+      // Ancho según orientación seleccionada
+      const exportWidth = exportOrientation === 'horizontal' ? 1800 : 1000
       deckViewRef.current.style.position = 'absolute'
       deckViewRef.current.style.top = '0'
       deckViewRef.current.style.left = '-9999px'
@@ -521,7 +523,7 @@ export default function DeckViewPage() {
         useCORS: true,
         allowTaint: true,
         foreignObjectRendering: false, // Deshabilitar para evitar problemas con CSS moderno
-        width: 1000, // Ancho fijo para consistencia
+        width: exportWidth, // Ancho según orientación
         height: deckViewRef.current.scrollHeight, // Altura automática basada en contenido
         onclone: (clonedDoc, element) => {
           try {
@@ -697,8 +699,8 @@ export default function DeckViewPage() {
               
               {/* Contenido sobre la imagen */}
               <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex-1">
-                  <h1 className="text-3xl font-bold text-[#F4C430] mb-2 drop-shadow-lg">{deck.name}</h1>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[#F4C430] mb-2 drop-shadow-lg break-words">{deck.name}</h1>
                   
                   {deck.description && (
                     <p className="text-[#A0A0A0] mb-3 drop-shadow">{deck.description}</p>
@@ -727,31 +729,58 @@ export default function DeckViewPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
                   <button
                     onClick={handleOpenHandTest}
-                    className="px-5 py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg"
+                    className="px-3 py-2 sm:px-5 sm:py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg text-sm sm:text-base whitespace-nowrap"
                   >
-                    🎴 Probar Mano
+                    <span className="hidden sm:inline">🎴 Probar Mano</span>
+                    <span className="sm:hidden">🎴 Mano</span>
                   </button>
-                  <button
-                    onClick={handleExportImage}
-                    disabled={exporting}
-                    className="px-5 py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {exporting ? '📸 Exportando...' : '📸 Exportar Imagen'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={exportOrientation}
+                      onChange={(e) => setExportOrientation(e.target.value as 'vertical' | 'horizontal')}
+                      className="px-2 py-2 sm:px-4 sm:py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg focus:outline-none focus:border-[#4ECDC4] transition-colors font-medium shadow-lg appearance-none cursor-pointer text-sm sm:text-base"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234ECDC4' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 0.5rem center',
+                        paddingRight: '1.75rem'
+                      }}
+                    >
+                      <option value="vertical">📱 Vertical</option>
+                      <option value="horizontal">🖥️ Horizontal</option>
+                    </select>
+                    <button
+                      onClick={handleExportImage}
+                      disabled={exporting}
+                      className="px-3 py-2 sm:px-5 sm:py-2.5 bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] rounded-lg hover:bg-[#2D9B96] hover:text-white transition-colors font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base whitespace-nowrap"
+                    >
+                      {exporting ? (
+                        <>
+                          <span className="hidden sm:inline">📸 Exportando...</span>
+                          <span className="sm:hidden">📸...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="hidden sm:inline">📸 Exportar Imagen</span>
+                          <span className="sm:hidden">📸 Exportar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                   {fromCommunity && deck.is_public && (
                     <button
                       onClick={handleLike}
-                      className={`px-5 py-2.5 rounded-lg transition-colors font-medium shadow-lg flex items-center gap-2 ${
+                      className={`px-3 py-2 sm:px-5 sm:py-2.5 rounded-lg transition-colors font-medium shadow-lg flex items-center gap-1 sm:gap-2 text-sm sm:text-base whitespace-nowrap ${
                         isLiked
                           ? 'bg-red-600/20 border border-red-600/50 text-red-400 hover:bg-red-600/30'
                           : 'bg-[#1A2332] border border-[#2D9B96] text-[#4ECDC4] hover:bg-[#2D9B96] hover:text-white'
                       }`}
                     >
                       <svg
-                        className="w-5 h-5"
+                        className="w-4 h-4 sm:w-5 sm:h-5"
                         fill={isLiked ? 'currentColor' : 'none'}
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -769,9 +798,10 @@ export default function DeckViewPage() {
                   {!fromCommunity && (
                     <button
                       onClick={() => router.push(`/decks/${deck.id}/edit`)}
-                      className="px-5 py-2.5 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-colors font-medium shadow-lg"
+                      className="px-3 py-2 sm:px-5 sm:py-2.5 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-colors font-medium shadow-lg text-sm sm:text-base whitespace-nowrap"
                     >
-                      Editar Baraja
+                      <span className="hidden sm:inline">Editar Baraja</span>
+                      <span className="sm:hidden">Editar</span>
                     </button>
                   )}
                 </div>
@@ -828,9 +858,9 @@ export default function DeckViewPage() {
             position: 'absolute', 
             left: '-9999px',
             top: '0',
-            width: '1000px',
-            maxWidth: '1000px',
-            minWidth: '1000px'
+            width: exportOrientation === 'horizontal' ? '1800px' : '1000px',
+            maxWidth: exportOrientation === 'horizontal' ? '1800px' : '1000px',
+            minWidth: exportOrientation === 'horizontal' ? '1800px' : '1000px'
           }}
         >
           {/* Header simple con solo texto para exportación */}
@@ -852,8 +882,11 @@ export default function DeckViewPage() {
             </div>
           </div>
 
-          {/* Grid de Cartas para exportación - Layout estándar consistente */}
-          <div className="grid grid-cols-5 gap-4" style={{ width: '100%' }}>
+          {/* Grid de Cartas para exportación - Layout según orientación */}
+          <div className={`grid gap-4`} style={{ 
+            width: '100%',
+            gridTemplateColumns: exportOrientation === 'horizontal' ? 'repeat(9, 1fr)' : 'repeat(5, 1fr)'
+          }}>
           {cardsToDisplay.map((entry) => {
             // Verificar que la carta existe
             if (!entry.card) {

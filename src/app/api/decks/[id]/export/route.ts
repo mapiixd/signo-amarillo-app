@@ -11,7 +11,7 @@ export async function POST(
   try {
     const { id } = await params
     const body = await request.json()
-    const { html, width = 1000, activeTab = 'main' } = body
+    const { html, width = 1000, activeTab = 'main', orientation = 'vertical' } = body
 
     // Importación dinámica de puppeteer
     let browser
@@ -134,7 +134,7 @@ export async function POST(
             }
             .grid {
               display: grid;
-              grid-template-columns: repeat(5, 1fr);
+              grid-template-columns: repeat(${orientation === 'horizontal' ? 9 : 5}, 1fr);
               gap: 16px;
             }
             .card-container {

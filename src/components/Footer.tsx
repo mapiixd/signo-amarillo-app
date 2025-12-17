@@ -3,15 +3,7 @@ export default function Footer() {
     <footer className="bg-[#0A0E1A] border-t border-[#2D9B96] py-8 mt-16">
       <div className="container mx-auto px-4">
         <div className="text-center space-y-4">
-          {/* Logo y nombre */}
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <img 
-              src="/logo-icon.png" 
-              alt="El Signo Amarillo" 
-              className="w-8 h-8 drop-shadow-[0_0_8px_rgba(244,196,48,0.5)]"
-            />
-            <span className="logo-title text-xl font-bold text-[#F4C430]">El Signo Amarillo</span>
-          </div>
+          
 
           {/* Acciones: Donaciones y Contacto */}
           <div className="pt-4 space-y-3">
