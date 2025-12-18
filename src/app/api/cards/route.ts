@@ -76,9 +76,13 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Filtro de raza
+      // Filtro de raza - buscar si la raza está contenida en el campo (soporta multi-raza)
+      // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
+      // También incluir aliados sin raza cuando se busca una raza específica
       if (race) {
-        query = query.eq('race', race)
+        // No aplicar el filtro aquí en la query de Supabase porque necesitamos
+        // lógica más compleja que incluya aliados sin raza
+        // Se aplicará después de obtener las cartas
       }
 
       // Filtro de habilidad (texto)
@@ -344,6 +348,33 @@ export async function GET(request: NextRequest) {
         normalizeString(card.name).includes(normalizedSearch) ||
         (card.description && normalizeString(card.description).includes(normalizedSearch))
       )
+    }
+
+    // Aplicar filtro de raza - buscar si la raza está contenida en el campo (soporta multi-raza)
+    // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
+    if (race) {
+      filteredCards = filteredCards.filter(card => {
+        // Si no es aliado, no aplicar filtro de raza
+        if (card.type !== 'ALIADO') {
+          return true
+        }
+        
+        const cardRace = (card.race || '').trim()
+        
+        // Si se busca específicamente "Sin Raza", mostrar solo aliados sin raza
+        if (race === 'Sin Raza') {
+          return cardRace === '' || cardRace === 'Sin Raza'
+        }
+        
+        // Para otras razas, excluir aliados sin raza o con raza vacía
+        if (cardRace === '' || cardRace === 'Sin Raza') {
+          return false
+        }
+        
+        // Incluir aliados que tengan la raza buscada contenida en su campo de raza
+        // Esto soporta multi-raza como "Bestia, Dragón, Sombra"
+        return cardRace.includes(race)
+      })
     }
 
     // Aplicar filtro de rotación si se solicita

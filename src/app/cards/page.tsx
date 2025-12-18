@@ -45,7 +45,8 @@ export default function CardsPage() {
     'Eterno',
     'Bestia',
     'Dragón',
-    'Héroe'
+    'Héroe',
+    'Sin Raza'
   ]
 
   useEffect(() => {
