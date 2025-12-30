@@ -22,8 +22,11 @@ export function middleware(request: NextRequest) {
   }
 
   // Rutas públicas
-  const publicRoutes = ['/', '/cards', '/login', '/register'];
+  const publicRoutes = ['/', '/cards', '/login', '/register', '/decks/community'];
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith('/cards/'));
+  
+  // Verificar si es una ruta de visualización de mazo individual (puede ser pública si el mazo es público)
+  const isDeckViewRoute = /^\/decks\/[^\/]+$/.test(pathname) && pathname !== '/decks/community';
 
   // Rutas de administrador
   const isAdminRoute = pathname.startsWith('/admin');
@@ -37,26 +40,32 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Rutas de API públicas (cards, expansions, etc.)
-  const isPublicApiRoute = pathname.startsWith('/api/cards') || pathname.startsWith('/api/expansions');
+  // Rutas de API públicas (cards, expansions, community decks, etc.)
+  // /api/decks/[id] puede ser pública si el mazo es público, pero eso se verifica en la API
+  const isPublicApiRoute = pathname.startsWith('/api/cards') || pathname.startsWith('/api/expansions') || pathname.startsWith('/api/decks/community');
   if (isPublicApiRoute) {
     return NextResponse.next();
   }
+  
+  // Permitir acceso a GET /api/decks/[id] sin autenticación (la API verificará si es público)
+  if (pathname.match(/^\/api\/decks\/[^\/]+$/) && request.method === 'GET') {
+    return NextResponse.next();
+  }
 
-  // Si es ruta pública, permitir acceso
-  if (isPublicRoute && !isAdminRoute && !isAdminApiRoute) {
+  // Si es ruta pública o visualización de mazo, permitir acceso
+  if ((isPublicRoute || isDeckViewRoute) && !isAdminRoute && !isAdminApiRoute) {
     return NextResponse.next();
   }
 
   // Verificar autenticación
   if (!token) {
     console.log('Middleware: No hay token, redirigiendo a login');
-    // Si intenta acceder a admin o decks, redirigir a login
-    if (isAdminRoute || pathname.startsWith('/decks')) {
+    // Si intenta acceder a admin o decks (excepto community y visualización individual), redirigir a login
+    if (isAdminRoute || (pathname.startsWith('/decks') && pathname !== '/decks/community' && !isDeckViewRoute)) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
-    // API devuelve 401
-    if (pathname.startsWith('/api/')) {
+    // API devuelve 401 (excepto rutas públicas)
+    if (pathname.startsWith('/api/') && !isPublicApiRoute && !pathname.match(/^\/api\/decks\/[^\/]+$/)) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
   }
@@ -68,12 +77,12 @@ export function middleware(request: NextRequest) {
     if (!payload) {
       console.log('Middleware: Token inválido, eliminando cookie y redirigiendo');
       // Token inválido
-      if (isAdminRoute || pathname.startsWith('/decks')) {
+      if (isAdminRoute || (pathname.startsWith('/decks') && pathname !== '/decks/community' && !isDeckViewRoute)) {
         const response = NextResponse.redirect(new URL('/login', request.url));
         response.cookies.delete('session_token');
         return response;
       }
-      if (pathname.startsWith('/api/')) {
+      if (pathname.startsWith('/api/') && !isPublicApiRoute && !pathname.match(/^\/api\/decks\/[^\/]+$/)) {
         const response = NextResponse.json({ error: 'Token inválido' }, { status: 401 });
         response.cookies.delete('session_token');
         return response;

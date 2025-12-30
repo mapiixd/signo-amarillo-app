@@ -1,7 +1,132 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, getCurrentSession } from '@/lib/auth'
 import type { DeckCardEntry } from '@/types'
+
+// GET /api/decks/[id] - Obtener una baraja (pública sin autenticación, privada requiere autenticación)
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = getSupabaseClient()
+    const { id } = await params
+    
+    // Obtener el mazo
+    const { data: deck, error: deckError } = await supabase
+      .from('decks')
+      .select(`
+        *,
+        deck_likes (
+          id,
+          user_id
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (deckError || !deck) {
+      return NextResponse.json(
+        { error: 'Mazo no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    // Obtener sesión actual (si existe)
+    const session = await getCurrentSession()
+    
+    // Si el mazo es público, permitir acceso sin autenticación
+    // Si es privado, verificar que el usuario esté autenticado y sea el dueño
+    if (!deck.is_public) {
+      if (!session || session.user.id !== deck.user_id) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para ver este mazo' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Obtener información del usuario
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id, username')
+      .eq('id', deck.user_id)
+      .single()
+
+    // Contar likes
+    const likesCount = deck.deck_likes?.length || 0
+
+    // Verificar si el usuario actual dio like (solo si está autenticado)
+    let is_liked = undefined
+    if (session && deck.is_public) {
+      const userLiked = deck.deck_likes?.some((like: any) => like.user_id === session.user.id)
+      is_liked = userLiked || false
+    }
+
+    // Extraer los IDs de las cartas del JSONB
+    const cardIds = (deck.cards || []).map((c: DeckCardEntry) => c.card_id)
+    const sideboardIds = (deck.sideboard || []).map((c: DeckCardEntry) => c.card_id)
+    const allCardIds = [...cardIds, ...sideboardIds]
+
+    if (allCardIds.length === 0) {
+      return NextResponse.json({
+        ...deck,
+        cards: [],
+        sideboard: [],
+        likes_count: likesCount,
+        is_liked: is_liked,
+        user: userData ? { id: userData.id, username: userData.username } : null
+      })
+    }
+
+    // Obtener datos completos de todas las cartas
+    const { data: cardsData, error: cardsError } = await supabase
+      .from('cards')
+      .select('*')
+      .in('id', allCardIds)
+
+    if (cardsError) {
+      console.error('Error fetching cards:', cardsError)
+      return NextResponse.json({
+        ...deck,
+        cards: [],
+        sideboard: [],
+        likes_count: likesCount,
+        is_liked: is_liked,
+        user: userData ? { id: userData.id, username: userData.username } : null
+      })
+    }
+
+    // Crear un mapa de cartas por ID para búsqueda rápida
+    const cardsMap = new Map(cardsData.map((card: any) => [card.id, card]))
+
+    // Combinar datos del JSONB con los datos completos de las cartas
+    const expandedCards = (deck.cards || []).map((entry: DeckCardEntry) => ({
+      ...entry,
+      card: cardsMap.get(entry.card_id)
+    })).filter((c: any) => c.card)
+
+    const expandedSideboard = (deck.sideboard || []).map((entry: DeckCardEntry) => ({
+      ...entry,
+      card: cardsMap.get(entry.card_id)
+    })).filter((c: any) => c.card)
+
+    return NextResponse.json({
+      ...deck,
+      cards: expandedCards,
+      sideboard: expandedSideboard,
+      likes_count: likesCount,
+      is_liked: is_liked,
+      user: userData ? { id: userData.id, username: userData.username } : null
+    })
+  } catch (error: any) {
+    console.error('Error fetching deck:', error)
+    return NextResponse.json(
+      { error: 'Error al obtener el mazo' },
+      { status: 500 }
+    )
+  }
+}
 
 // PUT /api/decks/[id] - Actualizar una baraja
 export async function PUT(

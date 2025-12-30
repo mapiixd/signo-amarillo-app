@@ -4,12 +4,23 @@ import nodemailer from 'nodemailer';
  * Configuración del transportador de Gmail
  */
 function createTransporter() {
-  const email = process.env.GMAIL_EMAIL;
-  const password = process.env.GMAIL_APP_PASSWORD;
+  let email = process.env.GMAIL_EMAIL;
+  let password = process.env.GMAIL_APP_PASSWORD;
 
   if (!email || !password) {
     throw new Error('GMAIL_EMAIL y GMAIL_APP_PASSWORD deben estar configurados en las variables de entorno');
   }
+
+  // Limpiar comillas y espacios en los extremos (por si vienen de Cloud Run con comillas)
+  email = email.trim().replace(/^["']|["']$/g, '');
+  password = password.trim().replace(/^["']|["']$/g, '');
+
+  // Eliminar espacios de la contraseña (las contraseñas de aplicación de Gmail pueden tener espacios)
+  // pero nodemailer necesita que estén sin espacios
+  password = password.replace(/\s+/g, '');
+
+  console.log('Configurando Gmail con email:', email);
+  console.log('Longitud de contraseña:', password.length);
 
   return nodemailer.createTransport({
     service: 'gmail',
@@ -25,8 +36,15 @@ function createTransporter() {
  */
 export async function sendPasswordResetEmail(to: string, resetToken: string, username: string) {
   const transporter = createTransporter();
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+  // Limpiar comillas y espacios de la URL base si los hay
+  let baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').trim();
+  baseUrl = baseUrl.replace(/^["']|["']$/g, ''); // Eliminar comillas al inicio y final
+  // Asegurar que no termine con /
+  baseUrl = baseUrl.replace(/\/$/, '');
+  // Codificar el token en la URL para evitar problemas con caracteres especiales
+  const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+  
+  console.log('URL de reset generada:', resetUrl);
 
   const mailOptions = {
     from: `"El Signo Amarillo" <${process.env.GMAIL_EMAIL}>`,
@@ -67,17 +85,18 @@ export async function sendPasswordResetEmail(to: string, resetToken: string, use
             .button {
               display: inline-block;
               background-color: #F4C430;
-              color: #0A0E1A;
+              color: #0A0E1A !important;
               padding: 12px 30px;
-              text-decoration: none;
+              text-decoration: none !important;
               border-radius: 5px;
               font-weight: bold;
               margin: 20px 0;
               text-align: center;
+              cursor: pointer;
             }
             .button:hover {
               background-color: #2D9B96;
-              color: white;
+              color: white !important;
             }
             .footer {
               margin-top: 30px;
@@ -106,11 +125,13 @@ export async function sendPasswordResetEmail(to: string, resetToken: string, use
               <p>Hola <strong>${username}</strong>,</p>
               <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta.</p>
               <p>Haz clic en el siguiente botón para crear una nueva contraseña:</p>
-              <div style="text-align: center;">
-                <a href="${resetUrl}" class="button">Restablecer Contraseña</a>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetUrl}" class="button" style="display: inline-block; background-color: #F4C430; color: #0A0E1A !important; padding: 12px 30px; text-decoration: none !important; border-radius: 5px; font-weight: bold; cursor: pointer;">Restablecer Contraseña</a>
               </div>
               <p>O copia y pega este enlace en tu navegador:</p>
-              <p style="word-break: break-all; color: #2D9B96;">${resetUrl}</p>
+              <p style="word-break: break-all; color: #2D9B96; margin: 10px 0;">
+                <a href="${resetUrl}" style="color: #2D9B96; text-decoration: underline;">${resetUrl}</a>
+              </p>
               <div class="warning">
                 <strong>⚠️ Importante:</strong>
                 <ul>

@@ -16,8 +16,12 @@ function ResetPasswordForm() {
   useEffect(() => {
     document.title = 'Restablecer Contraseña | El Signo Amarillo';
     const tokenParam = searchParams.get('token');
+    console.log('Token recibido de URL:', tokenParam);
     if (tokenParam) {
-      setToken(tokenParam);
+      // Decodificar el token por si viene codificado en la URL
+      const decodedToken = decodeURIComponent(tokenParam);
+      console.log('Token decodificado:', decodedToken);
+      setToken(decodedToken);
     } else {
       Swal.fire({
         icon: 'error',
@@ -73,6 +77,8 @@ function ResetPasswordForm() {
     }
 
     setIsLoading(true);
+
+    console.log('Enviando solicitud de reset con token:', token);
 
     try {
       const response = await fetch('/api/auth/reset-password', {

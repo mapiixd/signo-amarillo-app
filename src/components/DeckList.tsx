@@ -3,6 +3,7 @@
 import { DeckWithCards } from '@/types'
 import Link from 'next/link'
 import Swal from 'sweetalert2'
+import { formatDate } from '@/lib/utils'
 
 interface DeckListProps {
   decks: DeckWithCards[]
@@ -142,7 +143,7 @@ export function DeckList({ decks, onDelete }: DeckListProps) {
 
             {/* Footer info */}
             <div className="text-xs text-[#A0A0A0] mb-4 flex items-center justify-between">
-              <span>Creada: {new Date(deck.created_at).toLocaleDateString('es-ES')}</span>
+              <span>Creada: {formatDate(deck.created_at)}</span>
               {deck.is_public && (
                 <span className="text-[#4ECDC4]">🌐 Pública</span>
               )}

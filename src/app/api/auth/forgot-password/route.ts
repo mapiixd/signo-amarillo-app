@@ -55,7 +55,9 @@ export async function POST(request: NextRequest) {
 
     // Generar token de recuperación único
     const resetToken = randomUUID();
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    // Crear fecha de expiración (1 hora desde ahora)
+    // Usar toISOString() asegura que se guarde en UTC en la base de datos
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     // Eliminar tokens de recuperación anteriores del usuario
     await supabase
@@ -64,15 +66,23 @@ export async function POST(request: NextRequest) {
       .eq('userid', user.id);
 
     // Guardar token en la base de datos
-    const { error: insertError } = await supabase
+    console.log('Guardando token de recuperación:', {
+      userId: user.id,
+      token: resetToken,
+      expiresAt: expiresAt.toISOString()
+    });
+
+    const { data: insertedToken, error: insertError } = await supabase
       .from('password_reset_tokens')
       .insert({
         id: randomUUID(),
         userid: user.id,
         token: resetToken,
-        expiresat: expiresAt.toISOString(),
+        expiresat: expiresAt.toISOString(), // toISOString() siempre devuelve UTC
         createdat: new Date().toISOString(),
-      });
+      })
+      .select()
+      .single();
 
     if (insertError) {
       console.error('Error guardando token de recuperación:', insertError);
@@ -81,6 +91,12 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    console.log('Token guardado exitosamente:', {
+      id: insertedToken?.id,
+      token: insertedToken?.token,
+      userid: insertedToken?.userid
+    });
 
     // Enviar correo de recuperación
     try {

@@ -8,6 +8,7 @@ import Footer from '@/components/Footer'
 import html2canvas from 'html2canvas'
 import Swal from 'sweetalert2'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { formatDate } from '@/lib/utils'
 
 interface DeckWithLikes extends DeckWithCards {
   likes_count?: number
@@ -123,20 +124,25 @@ export default function DeckViewPage() {
 
   const fetchDeck = async (id: string) => {
     try {
-      if (fromCommunity) {
-        // Si viene de la comunidad, buscar en los mazos públicos
-        const response = await fetch('/api/decks/community?limit=1000')
-        if (response.ok) {
-          const data = await response.json()
-          const foundDeck = data.decks.find((d: DeckWithLikes) => d.id === id)
-          if (foundDeck) {
-            setDeck(foundDeck)
-            setLikesCount(foundDeck.likes_count || 0)
-            return
-          }
+      setLoading(true)
+      // Intentar obtener el mazo directamente por ID (funciona para mazos públicos sin autenticación)
+      const response = await fetch(`/api/decks/${id}`, {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const deck = await response.json()
+        setDeck(deck)
+        setLikesCount(deck.likes_count || 0)
+        if (deck.is_liked !== undefined) {
+          setIsLiked(deck.is_liked)
         }
-        // Si no se encuentra en la comunidad, intentar desde los mazos del usuario (por si es el dueño)
-        const userResponse = await fetch('/api/decks')
+        return
+      } else if (response.status === 403) {
+        // Mazo privado, intentar desde los mazos del usuario si está autenticado
+        const userResponse = await fetch('/api/decks', {
+          credentials: 'include'
+        })
         if (userResponse.ok) {
           const decks = await userResponse.json()
           const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
@@ -145,31 +151,35 @@ export default function DeckViewPage() {
             return
           }
         }
-      } else {
-        // Si no viene de la comunidad, buscar en los mazos del usuario
-        const response = await fetch('/api/decks')
-        if (response.ok) {
-          const decks = await response.json()
-          const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
-          if (foundDeck) {
-            setDeck(foundDeck)
-            return
-          }
-        }
-        // Si no se encuentra en los mazos del usuario, intentar desde la comunidad (por si es público)
-        const communityResponse = await fetch('/api/decks/community?limit=1000')
-        if (communityResponse.ok) {
-          const data = await communityResponse.json()
-          const foundDeck = data.decks.find((d: DeckWithLikes) => d.id === id)
-          if (foundDeck) {
-            setDeck(foundDeck)
-            setLikesCount(foundDeck.likes_count || 0)
-            return
-          }
-        }
+        // Si no se encuentra, mostrar error
+        Swal.fire({
+          icon: 'error',
+          title: 'Acceso denegado',
+          text: 'No tienes permiso para ver este mazo',
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430'
+        })
+      } else if (response.status === 404) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Mazo no encontrado',
+          text: 'El mazo que buscas no existe',
+          confirmButtonColor: '#2D9B96',
+          background: '#121825',
+          color: '#F4C430'
+        })
       }
     } catch (error) {
       console.error('Error fetching deck:', error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error al cargar el mazo',
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
     } finally {
       setLoading(false)
     }
@@ -812,7 +822,7 @@ export default function DeckViewPage() {
                       {deck.format || 'Imperio Racial'}
                     </span>
                     <span className="text-[#A0A0A0]">
-                      Creada: {new Date(deck.created_at).toLocaleDateString('es-ES')}
+                      Creada: {formatDate(deck.created_at)}
                     </span>
                     {deck.is_public && (
                       <span className="text-[#4ECDC4]">🌐 Pública</span>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Swal from 'sweetalert2'
 import Footer from '@/components/Footer'
 import { useRouter } from 'next/navigation'
+import { formatDate } from '@/lib/utils'
 
 interface CommunityDeck extends DeckWithCards {
   likes_count?: number
@@ -27,19 +28,20 @@ export default function CommunityDecksPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<any>(null)
-  const [sortBy, setSortBy] = useState<'likes' | 'recent' | 'name'>('likes')
+  const [sortBy, setSortBy] = useState<'likes' | 'recent' | 'name'>('recent')
   const [selectedRace, setSelectedRace] = useState<string>('')
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     checkAuthentication()
+    // Cargar mazos inmediatamente sin esperar autenticación
+    fetchDecks()
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated === true) {
-      fetchDecks()
-    }
-  }, [currentPage, sortBy, selectedRace, isAuthenticated])
+    // Recargar mazos cuando cambian los filtros o paginación
+    fetchDecks()
+  }, [currentPage, sortBy, selectedRace])
 
   const checkAuthentication = async () => {
     try {
@@ -49,38 +51,26 @@ export default function CommunityDecksPage() {
       
       if (response.status === 401) {
         setIsAuthenticated(false)
-        Swal.fire({
-          icon: 'info',
-          title: 'Inicia sesión',
-          text: 'Debes iniciar sesión para ver los mazos de la comunidad',
-          confirmButtonColor: '#2D9B96',
-          background: '#121825',
-          color: '#F4C430',
-          confirmButtonText: 'Ir a iniciar sesión'
-        }).then((result) => {
-          if (result.isConfirmed) {
-            router.push('/login')
-          } else {
-            router.push('/')
-          }
-        })
       } else if (response.ok) {
         setIsAuthenticated(true)
       } else {
         setIsAuthenticated(false)
-        router.push('/login')
       }
     } catch (error) {
       console.error('Error checking authentication:', error)
       setIsAuthenticated(false)
-      router.push('/login')
     }
   }
 
   useEffect(() => {
     // Cargar likes del usuario si está autenticado
-    fetchUserLikes()
-  }, [decks])
+    if (isAuthenticated === true) {
+      fetchUserLikes()
+    } else {
+      // Si no está autenticado, limpiar los likes
+      setUserLikes(new Set())
+    }
+  }, [decks, isAuthenticated])
 
   const fetchDecks = async () => {
     try {
@@ -95,16 +85,19 @@ export default function CommunityDecksPage() {
         credentials: 'include'
       })
       
-      if (response.status === 401) {
-        setIsAuthenticated(false)
-        router.push('/login')
-        return
-      }
-      
       if (response.ok) {
         const data = await response.json()
         setDecks(data.decks)
         setPagination(data.pagination)
+        
+        // Actualizar estado de autenticación si cambió
+        if (response.status === 200) {
+          // Verificar si hay algún mazo con is_liked definido (indica que el usuario está autenticado)
+          const hasLikesInfo = data.decks.some((deck: CommunityDeck) => deck.is_liked !== undefined)
+          if (hasLikesInfo && isAuthenticated === false) {
+            setIsAuthenticated(true)
+          }
+        }
       } else {
         const error = await response.json()
         Swal.fire({
@@ -132,25 +125,12 @@ export default function CommunityDecksPage() {
   }
 
   const fetchUserLikes = async () => {
+    if (!isAuthenticated) return
+    
     try {
-      // Verificar likes para cada mazo
-      const likePromises = decks.map(async (deck) => {
-        try {
-          const response = await fetch(`/api/decks/${deck.id}/like`)
-          if (response.ok) {
-            const data = await response.json()
-            return { deckId: deck.id, liked: data.liked }
-          }
-        } catch (error) {
-          // Si no está autenticado, simplemente no marcar como liked
-          return { deckId: deck.id, liked: false }
-        }
-        return { deckId: deck.id, liked: false }
-      })
-
-      const likes = await Promise.all(likePromises)
+      // Usar la información de is_liked que ya viene de la API si está disponible
       const likesSet = new Set(
-        likes.filter(l => l.liked).map(l => l.deckId)
+        decks.filter(deck => deck.is_liked === true).map(deck => deck.id)
       )
       setUserLikes(likesSet)
     } catch (error) {
@@ -288,26 +268,19 @@ export default function CommunityDecksPage() {
     'Sombra'
   ]
 
-  // Mostrar carga mientras se verifica autenticación
-  if (isAuthenticated === null || (loading && decks.length === 0)) {
+  // Mostrar carga mientras se cargan los mazos
+  if (loading && decks.length === 0) {
     return (
       <div className="flex flex-col flex-1 bg-gradient-to-br from-[#0A0E1A] via-[#121825] to-[#0A0E1A]">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F4C430] mx-auto mb-4"></div>
-            <p className="text-[#4ECDC4]">
-              {isAuthenticated === null ? 'Verificando autenticación...' : 'Cargando mazos de la comunidad...'}
-            </p>
+            <p className="text-[#4ECDC4]">Cargando mazos de la comunidad...</p>
           </div>
         </div>
         <Footer />
       </div>
     )
-  }
-
-  // Si no está autenticado, no mostrar nada (ya se redirigió)
-  if (isAuthenticated === false) {
-    return null
   }
 
   return (
@@ -374,7 +347,8 @@ export default function CommunityDecksPage() {
             {decks.map((deck) => {
               const totalCards = deck.cards.reduce((sum, c) => sum + c.quantity, 0)
               const totalSideboard = deck.sideboard.reduce((sum, c) => sum + c.quantity, 0)
-              const isLiked = userLikes.has(deck.id)
+              // Usar is_liked de la API si está disponible, o del estado local
+              const isLiked = deck.is_liked !== undefined ? deck.is_liked : userLikes.has(deck.id)
 
               return (
                 <div
@@ -443,7 +417,7 @@ export default function CommunityDecksPage() {
 
                     {/* Footer info */}
                     <div className="text-xs text-[#A0A0A0] mb-4 flex items-center justify-between">
-                      <span>Creada: {new Date(deck.created_at).toLocaleDateString('es-ES')}</span>
+                      <span>Creada: {formatDate(deck.created_at)}</span>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleLike(deck.id)}

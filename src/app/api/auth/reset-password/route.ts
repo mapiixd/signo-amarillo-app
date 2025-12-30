@@ -24,13 +24,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar token de recuperación
+    console.log('Buscando token de recuperación:', token);
+    
+    // Primero buscar el token
     const { data: resetTokenData, error: tokenError } = await supabase
       .from('password_reset_tokens')
-      .select('*, users(*)')
+      .select('*')
       .eq('token', token)
       .single();
 
-    if (tokenError || !resetTokenData) {
+    console.log('Resultado de búsqueda de token:', {
+      found: !!resetTokenData,
+      error: tokenError,
+      tokenData: resetTokenData ? {
+        id: resetTokenData.id,
+        userid: resetTokenData.userid,
+        expiresat: resetTokenData.expiresat
+      } : null
+    });
+
+    if (tokenError) {
+      console.error('Error buscando token:', tokenError);
+      // Si el error es porque no se encontró, dar mensaje más específico
+      if (tokenError.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Token inválido o expirado' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'Token inválido o expirado', details: tokenError.message },
+        { status: 400 }
+      );
+    }
+
+    if (!resetTokenData) {
+      console.log('Token no encontrado en la base de datos');
       return NextResponse.json(
         { error: 'Token inválido o expirado' },
         { status: 400 }
@@ -38,8 +67,41 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que el token no haya expirado
-    const expiresAt = new Date(resetTokenData.expiresat);
-    if (expiresAt < new Date()) {
+    // Parsear la fecha correctamente (Supabase devuelve timestamptz como string en UTC)
+    const expiresAtStr = resetTokenData.expiresat;
+    const expiresAt = new Date(expiresAtStr);
+    // Usar UTC para la comparación para evitar problemas de zona horaria
+    const now = new Date();
+    const nowUTC = new Date(now.toISOString());
+    
+    // Verificar que la fecha se parseó correctamente
+    if (isNaN(expiresAt.getTime())) {
+      console.error('Error parseando fecha de expiración:', expiresAtStr);
+      return NextResponse.json(
+        { error: 'Error al verificar el token' },
+        { status: 500 }
+      );
+    }
+
+    // Comparar usando timestamps (milisegundos desde epoch) para evitar problemas de zona horaria
+    const expiresAtTimestamp = expiresAt.getTime();
+    const nowTimestamp = now.getTime();
+    const isExpired = expiresAtTimestamp < nowTimestamp;
+    const diffMinutes = Math.round((expiresAtTimestamp - nowTimestamp) / 1000 / 60);
+
+    console.log('Verificando expiración (UTC):', {
+      expiresAtRaw: expiresAtStr,
+      expiresAtUTC: expiresAt.toISOString(),
+      expiresAtTimestamp: expiresAtTimestamp,
+      nowUTC: now.toISOString(),
+      nowTimestamp: nowTimestamp,
+      isExpired: isExpired,
+      diffMinutes: diffMinutes,
+      serverTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+
+    if (isExpired) {
+      console.log('Token expirado, eliminando...');
       // Eliminar token expirado
       await supabase
         .from('password_reset_tokens')
@@ -52,16 +114,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = Array.isArray(resetTokenData.users) 
-      ? resetTokenData.users[0] 
-      : resetTokenData.users;
+    console.log('Token válido, tiempo restante:', diffMinutes, 'minutos');
 
-    if (!user) {
+    // Buscar el usuario asociado al token
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, username, email')
+      .eq('id', resetTokenData.userid)
+      .single();
+
+    if (userError || !user) {
+      console.error('Error buscando usuario:', userError);
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
       );
     }
+
+    console.log('Usuario encontrado:', { id: user.id, username: user.username });
 
     // Hash de la nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);

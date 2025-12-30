@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
-import { requireAuth } from '@/lib/auth'
+import { getCurrentSession } from '@/lib/auth'
 import type { DeckCardEntry } from '@/types'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
@@ -10,12 +10,13 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseClient()
-    // Requerir autenticación para ver mazos de la comunidad
-    await requireAuth()
+    // Autenticación opcional - si el usuario está autenticado, incluiremos información de likes
+    const session = await getCurrentSession()
+    const currentUserId = session?.user?.id
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const sortBy = searchParams.get('sortBy') || 'likes' // 'likes', 'recent', 'name'
+    const sortBy = searchParams.get('sortBy') || 'recent' // 'likes', 'recent', 'name'
     const race = searchParams.get('race') || ''
     
     const offset = (page - 1) * limit
@@ -84,70 +85,49 @@ export async function GET(request: NextRequest) {
 
     const usersMap = new Map((usersData || []).map((u: any) => [u.id, u]))
 
-    // Expandir las cartas del JSONB con los datos completos
-    const decksWithCards = await Promise.all(
-      (decks || []).map(async (deck: any) => {
-        // Extraer los IDs de las cartas del JSONB
-        const cardIds = (deck.cards || []).map((c: DeckCardEntry) => c.card_id)
-        const sideboardIds = (deck.sideboard || []).map((c: DeckCardEntry) => c.card_id)
-        const allCardIds = [...cardIds, ...sideboardIds]
-
-        // Contar likes
-        const likesCount = deck.deck_likes?.length || 0
-
-        // Obtener información del usuario
-        const user = usersMap.get(deck.user_id)
-
-        if (allCardIds.length === 0) {
-          return {
-            ...deck,
-            cards: [],
-            sideboard: [],
-            likes_count: likesCount,
-            user: user ? { id: user.id, username: user.username } : null
-          }
+    // Obtener likes del usuario actual si está autenticado
+    let userLikesSet = new Set<string>()
+    if (currentUserId) {
+      const deckIds = (decks || []).map((d: any) => d.id)
+      if (deckIds.length > 0) {
+        const { data: userLikes } = await supabase
+          .from('deck_likes')
+          .select('deck_id')
+          .eq('user_id', currentUserId)
+          .in('deck_id', deckIds)
+        
+        if (userLikes) {
+          userLikesSet = new Set(userLikes.map((like: any) => like.deck_id))
         }
+      }
+    }
 
-        // Obtener datos completos de todas las cartas en 1 query
-        const { data: cardsData, error: cardsError } = await supabase
-          .from('cards')
-          .select('*')
-          .in('id', allCardIds)
+    // Para el listado, no necesitamos los datos completos de las cartas
+    // Solo mantenemos los IDs y cantidades para calcular totales
+    // Los datos completos se cargarán cuando el usuario vea el mazo individual
+    const decksWithCards = (decks || []).map((deck: any) => {
+      // Contar likes
+      const likesCount = deck.deck_likes?.length || 0
 
-        if (cardsError) {
-          console.error('Error fetching cards:', cardsError)
-          return {
-            ...deck,
-            cards: [],
-            sideboard: [],
-            likes_count: likesCount,
-            user: deck.users
-          }
-        }
+      // Verificar si el usuario actual dio like (solo si está autenticado)
+      const is_liked = currentUserId ? userLikesSet.has(deck.id) : undefined
 
-        // Crear un mapa de cartas por ID para búsqueda rápida
-        const cardsMap = new Map(cardsData.map((card: any) => [card.id, card]))
+      // Obtener información del usuario
+      const user = usersMap.get(deck.user_id)
 
-        // Combinar datos del JSONB con los datos completos de las cartas
-        const expandedCards = (deck.cards || []).map((entry: DeckCardEntry) => ({
-          ...entry,
-          card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
-
-        const expandedSideboard = (deck.sideboard || []).map((entry: DeckCardEntry) => ({
-          ...entry,
-          card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
-
-        return {
-          ...deck,
-          cards: expandedCards,
-          sideboard: expandedSideboard,
-          likes_count: likesCount,
-          user: user ? { id: user.id, username: user.username } : null
-        }
-      })
-    )
+      // Mantener solo la estructura básica de cards y sideboard (IDs y cantidades)
+      // No expandimos los datos completos de las cartas para optimizar la respuesta
+      return {
+        ...deck,
+        // Mantener cards y sideboard como están (solo IDs y cantidades)
+        // El frontend solo necesita las cantidades para mostrar totales
+        cards: deck.cards || [],
+        sideboard: deck.sideboard || [],
+        likes_count: likesCount,
+        is_liked: is_liked,
+        user: user ? { id: user.id, username: user.username } : null
+      }
+    })
 
     // Ordenar por likes si es necesario (después de obtener los datos)
     if (sortBy === 'likes') {
