@@ -435,55 +435,19 @@ export default function DeckViewPage() {
     setExporting(true)
     
     try {
-      // Detectar Safari en iOS
+      // Detectar Safari en iOS para usar configuración optimizada (sin servidor)
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       
-      // Si es Safari o iOS, usar exportación server-side primero
+      if (!deckViewRef.current) {
+        setExporting(false)
+        return
+      }
+      
+      // Safari/iOS: exportar con dimensiones reducidas (html2canvas en cliente)
       if (isSafari || isIOS) {
         try {
-          const response = await fetch(`/api/decks/${params.id}/export`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              activeTab: activeTab,
-              width: exportOrientation === 'horizontal' ? 1800 : 1000,
-              orientation: exportOrientation
-            })
-          })
-          
-          if (response.ok) {
-            // Descargar la imagen
-            const blob = await response.blob()
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_${activeTab}.jpg`
-            link.href = url
-            link.click()
-            URL.revokeObjectURL(url)
-            
-            setExporting(false)
-            return
-          }
-          
-          // Si falla el servidor, intentar método alternativo optimizado para Safari/iOS
-          console.warn('Servidor no disponible, usando método alternativo para Safari/iOS')
-          
-        } catch (serverError) {
-          console.error('Error en exportación server-side:', serverError)
-        }
-        
-        // Método alternativo para Safari/iOS: exportar con dimensiones reducidas
-        if (!deckViewRef.current) {
-          setExporting(false)
-          return
-        }
-        
-        try {
-          // Configurar el contenedor con dimensiones más pequeñas para Safari/iOS
-          const exportWidth = exportOrientation === 'horizontal' ? 1440 : 800 // Reducir ancho para Safari/iOS
+          const exportWidth = exportOrientation === 'horizontal' ? 1440 : 800
           deckViewRef.current.style.position = 'absolute'
           deckViewRef.current.style.top = '0'
           deckViewRef.current.style.left = '-9999px'
@@ -497,18 +461,16 @@ export default function DeckViewPage() {
           
           await new Promise(resolve => setTimeout(resolve, 300))
           
-          // Capturar con html2canvas usando configuración optimizada para Safari/iOS
           const canvas = await html2canvas(deckViewRef.current, {
             backgroundColor: '#0A0E1A',
-            scale: 1.5, // Reducir escala para Safari/iOS
+            scale: 1.5,
             logging: false,
             useCORS: true,
             allowTaint: true,
             foreignObjectRendering: false,
-            width: exportWidth, // Ancho según orientación
+            width: exportWidth,
             windowHeight: deckViewRef.current.scrollHeight,
             onclone: (clonedDoc, element) => {
-              // Ocultar botones y footer
               const actionButtons = element.querySelectorAll('button')
               actionButtons.forEach((btn) => {
                 const htmlBtn = btn as HTMLElement
@@ -517,7 +479,6 @@ export default function DeckViewPage() {
               const footer = element.querySelector('footer')
               if (footer) footer.style.display = 'none'
               
-              // Asegurar que los badges de cantidad sean perfectamente circulares en Safari/iOS
               const badges = element.querySelectorAll('.rounded-full')
               badges.forEach((badge) => {
                 const htmlBadge = badge as HTMLElement
@@ -531,7 +492,6 @@ export default function DeckViewPage() {
                   htmlBadge.style.display = 'flex'
                   htmlBadge.style.alignItems = 'center'
                   htmlBadge.style.justifyContent = 'center'
-                  // Ajustar posición del número dentro del badge
                   const span = htmlBadge.querySelector('span') as HTMLElement
                   if (span) {
                     span.style.transform = 'translateY(-10px)'
@@ -541,12 +501,10 @@ export default function DeckViewPage() {
             }
           })
           
-          // Restaurar estilos
           deckViewRef.current.style.visibility = 'hidden'
           deckViewRef.current.style.position = 'absolute'
           deckViewRef.current.style.left = '-9999px'
           
-          // Convertir a blob con mayor compresión para reducir tamaño
           canvas.toBlob((blob) => {
             if (blob) {
               const url = URL.createObjectURL(blob)
@@ -561,14 +519,14 @@ export default function DeckViewPage() {
           
           return
         } catch (safariError) {
-          console.error('Error en método alternativo Safari/iOS:', safariError)
+          console.error('Error en exportación Safari/iOS:', safariError)
           setExporting(false)
           alert('Error al exportar la imagen en Safari/iOS. Por favor, intenta desde un navegador de escritorio.')
           return
         }
       }
       
-      // Método cliente (html2canvas) para navegadores de escritorio
+      // Escritorio: html2canvas con máxima calidad
       if (!deckViewRef.current) return
       
       // Guardar estilos originales del contenedor de exportación

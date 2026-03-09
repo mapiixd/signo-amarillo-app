@@ -37,7 +37,6 @@
     "nanoid": "^5.1.6",
     "next": "15.5.4",
     "nodemailer": "^7.0.12",
-    "puppeteer": "^24.33.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^3.6.0",
