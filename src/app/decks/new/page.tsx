@@ -26,7 +26,9 @@ function NewDeckPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const raceParam = searchParams.get('race')
-  
+  const formatParam = searchParams.get('format')
+  const isVCRFormat = formatParam === 'vcr'
+
   const [name, setName] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -50,7 +52,7 @@ function NewDeckPageContent() {
   const prevMainDeckLengthRef = useRef<number>(0)
   const prevSideboardLengthRef = useRef<number>(0)
   const modalHistoryPushedRef = useRef<boolean>(false)
-  const STORAGE_KEY = 'deck-builder-draft'
+  const STORAGE_KEY = isVCRFormat ? 'deck-builder-draft-vcr' : 'deck-builder-draft'
 
   // Funciones para guardar y cargar el progreso
   const saveProgress = useCallback(() => {
@@ -69,11 +71,12 @@ function NewDeckPageContent() {
           quantity: sc.quantity
         })),
         deckRace,
+        deckFormat: isVCRFormat ? 'vcr' : 'racial',
         timestamp: Date.now()
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
     }
-  }, [selectedCards, sideboard, name, isPublic, deckRace])
+  }, [selectedCards, sideboard, name, isPublic, deckRace, isVCRFormat, STORAGE_KEY])
 
   const loadProgress = useCallback(async (): Promise<boolean> => {
     try {
@@ -82,8 +85,10 @@ function NewDeckPageContent() {
 
       const progress = JSON.parse(saved)
       
-      // Verificar que el progreso guardado sea de la misma raza
-      if (progress.deckRace !== deckRace) {
+      // Verificar que el progreso guardado sea del mismo formato y raza
+      const savedFormat = progress.deckFormat || 'racial'
+      const currentFormat = isVCRFormat ? 'vcr' : 'racial'
+      if (savedFormat !== currentFormat || progress.deckRace !== deckRace) {
         localStorage.removeItem(STORAGE_KEY)
         return false
       }
@@ -152,7 +157,7 @@ function NewDeckPageContent() {
       localStorage.removeItem(STORAGE_KEY)
       return false
     }
-  }, [cards, deckRace])
+  }, [cards, deckRace, isVCRFormat, STORAGE_KEY])
 
   const clearProgress = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
@@ -168,7 +173,7 @@ function NewDeckPageContent() {
   // Cargar progreso guardado al montar el componente (solo una vez)
   const hasLoadedProgressRef = useRef(false)
   useEffect(() => {
-    if (!loading && cards.length > 0 && raceParam && !hasLoadedProgressRef.current) {
+    if (!loading && cards.length > 0 && (raceParam || formatParam === 'vcr') && !hasLoadedProgressRef.current) {
       hasLoadedProgressRef.current = true
       loadProgress().then(hasProgress => {
         if (hasProgress) {
@@ -185,7 +190,7 @@ function NewDeckPageContent() {
         }
       })
     }
-  }, [loading, cards.length, raceParam, loadProgress])
+  }, [loading, cards.length, raceParam, formatParam, loadProgress])
 
   // Interceptar navegación hacia atrás para guardar progreso
   useEffect(() => {
@@ -237,7 +242,7 @@ function NewDeckPageContent() {
     }
   }, [selectedCardForView])
 
-  // Redirigir si no hay raza seleccionada
+  // Redirigir si no hay raza (Imperio Racial y VCR son formatos raciales; siempre se requiere raza)
   useEffect(() => {
     if (!raceParam) {
       router.push('/decks/format-select')
@@ -253,9 +258,9 @@ function NewDeckPageContent() {
   useEffect(() => {
     const loadBanlistForCards = async () => {
       if (cards.length === 0) return
-      
+
       try {
-        const format = 'Imperio Racial' as FormatType
+        const format: FormatType = isVCRFormat ? 'VCR' : 'Imperio Racial'
         const cache: Record<string, { status: BanStatus; maxCopies: number } | null> = {}
         
         // Cargar todas las banlists desde la API una sola vez (ruta pública)
@@ -295,7 +300,7 @@ function NewDeckPageContent() {
     }
     
     loadBanlistForCards()
-  }, [cards])
+  }, [cards, isVCRFormat])
 
   // Auto-scroll solo cuando se agrega una nueva carta al mazo principal (no cuando se modifica cantidad)
   useEffect(() => {
@@ -385,10 +390,10 @@ function NewDeckPageContent() {
     }
     
     // Validar si la carta está prohibida en el formato (usar cache)
-    const format = 'Imperio Racial' as FormatType
+    const format: FormatType = isVCRFormat ? 'VCR' : 'Imperio Racial'
     const banStatus = banlistCache[card.name] || null
     const isBanned = banStatus?.status === 'banned'
-    
+
     if (isBanned) {
       Swal.fire({
         icon: 'error',
@@ -432,7 +437,7 @@ function NewDeckPageContent() {
       return
     }
     
-    // Validar máximo 4 aliados sin raza en el mazo principal
+    // Validar máximo 4 aliados sin raza en el mazo principal (Imperio Racial y VCR son raciales)
     if (!toSideboard && isRaceless(card)) {
       const currentRacelessAllies = selectedCards
         .filter(sc => isRaceless(sc.card))
@@ -551,6 +556,7 @@ function NewDeckPageContent() {
         body: JSON.stringify({
           name,
           race: deckRace,
+          format: isVCRFormat ? 'VCR' : 'Imperio Racial',
           is_public: isPublic,
           cards: selectedCards.map(sc => ({
             id: sc.card.id,
@@ -621,15 +627,15 @@ function NewDeckPageContent() {
       return `Debes tener al menos 17 cartas entre Aliados, Armas y Tótems. Actualmente tienes ${allyWeaponTotemCount}.`
     }
     
-    // Validar máximo 4 aliados sin raza (race === null o vacío)
+    // Validar máximo 4 aliados sin raza (Imperio Racial y VCR son formatos raciales)
     const alliesWithoutRace = selectedCards
       .filter(sc => isRaceless(sc.card))
       .reduce((sum, sc) => sum + sc.quantity, 0)
-    
+
     if (alliesWithoutRace > 4) {
       return `No puedes tener más de 4 aliados sin raza en el mazo principal. Actualmente tienes ${alliesWithoutRace}.`
     }
-    
+
     return null
   }
 
@@ -650,23 +656,27 @@ function NewDeckPageContent() {
       const matchesAbility = !abilityFilter || (card.description?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(abilityFilter.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')) ?? false)
       const matchesType = typeFilter === 'Todas' || card.type === typeFilter
       const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
-      
-      // Filtro por raza del mazo: Si es aliado, solo mostrar los de la raza del mazo o sin raza
+
+      // Imperio VCR: solo cartas de rareza Vasallo, Cortesano y Real
+      if (isVCRFormat) {
+        const allowedRarities = ['VASALLO', 'CORTESANO', 'REAL']
+        if (!allowedRarities.includes(card.rarity)) return false
+      }
+
+      // Filtro por raza del mazo (Imperio Racial y VCR): si es aliado, solo de la raza del mazo o sin raza
       let matchesRace = true
       if (card.type === 'ALIADO') {
         const cardRace = card.race?.trim() || ''
-        
+
         // Siempre incluir cartas "Sin Raza" o sin raza definida
         if (cardRace === '' || cardRace === 'Sin Raza') {
           matchesRace = true
         } else {
           // Si el aliado tiene raza específica, debe CONTENER la raza del mazo (para soportar multi-raza)
-          // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
           matchesRace = cardRace.includes(deckRace)
         }
       }
-      // Si no es aliado (Arma, Talismán, Tótem, Oro), siempre se muestra
-      
+
       return matchesSearch && matchesAbility && matchesType && matchesExpansion && matchesRace
     })
     .sort((a, b) => {
@@ -737,10 +747,12 @@ function NewDeckPageContent() {
             ← Volver
           </button>
           <h1 className="text-3xl font-bold text-[#F4C430] mb-2">
-            Constructor de Mazos - Raza: {deckRace}
+            {isVCRFormat ? 'Constructor de Mazos - Imperio VCR' : `Constructor de Mazos - Raza: ${deckRace}`}
           </h1>
           <p className="text-[#2D9B96] text-sm mb-1">
-            Formato: Imperio Racial | Solo se mostrarán aliados de raza {deckRace} o sin raza
+            {isVCRFormat
+              ? `Formato: Imperio VCR | Raza: ${deckRace} | Solo cartas Vasallo, Cortesano y Real | Banlist VCR`
+              : `Formato: Imperio Racial | Solo se mostrarán aliados de raza ${deckRace} o sin raza`}
           </p>
           <p className="text-[#F4C430] text-xs italic">
           📋 Rotación activa: Espíritu Samurai - KvsM : Titanes
@@ -833,7 +845,6 @@ function NewDeckPageContent() {
                 const totalCopiesThisVersion = getTotalCopies(card.id)
                 // Contar todas las copias por nombre (para mostrar límites de banlist)
                 const totalCopiesByName = getTotalCopiesByName(card.name)
-                const format = 'Imperio Racial' as FormatType
                 const banStatus = banlistCache[card.name] || null
                 const isBanned = banStatus?.status === 'banned'
                 const isUniqueCard = card.description?.includes('Única.') || false

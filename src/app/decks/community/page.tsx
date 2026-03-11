@@ -6,7 +6,8 @@ import Link from 'next/link'
 import Swal from 'sweetalert2'
 import Footer from '@/components/Footer'
 import { useRouter } from 'next/navigation'
-import { formatDate } from '@/lib/utils'
+import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
+import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
 
 interface CommunityDeck extends DeckWithCards {
   likes_count?: number
@@ -363,7 +364,11 @@ export default function CommunityDecksPage() {
                         src={`/razas/${deck.race}.png`} 
                         alt={deck.race}
                         className="absolute inset-0 w-full h-full object-cover opacity-20"
-                        style={deck.race === 'Sombra' ? { objectPosition: '50% 10%' } : undefined}
+                        style={
+                          RACE_IMAGE_POSITION[deck.race]
+                            ? { objectPosition: RACE_IMAGE_POSITION[deck.race] }
+                            : undefined
+                        }
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                         }}
@@ -381,8 +386,8 @@ export default function CommunityDecksPage() {
                             {deck.race}
                           </span>
                         )}
-                        <span className="text-xs text-[#4ECDC4] font-medium">
-                          {deck.format || 'Imperio Racial'}
+                        <span className="text-xs bg-[#0A0E1A] text-[#4ECDC4] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
+                          {getFormatDisplayLabel(deck.format)}
                         </span>
                       </div>
                       {deck.user && (

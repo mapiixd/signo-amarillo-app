@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Footer from '@/components/Footer'
 
-type Format = 'racial' | null
+type Format = 'racial' | 'vcr' | null
 type Race = 'Bestia' | 'Caballero' | 'Dragón' | 'Eterno' | 'Faerie' | 'Guerrero' | 'Héroe' | 'Sacerdote' | 'Sombra' | null
 
 export default function FormatSelectPage() {
@@ -31,6 +31,9 @@ export default function FormatSelectPage() {
   const handleContinue = () => {
     if (selectedFormat === 'racial' && selectedRace) {
       router.push(`/decks/new?race=${encodeURIComponent(selectedRace)}`)
+    }
+    if (selectedFormat === 'vcr' && selectedRace) {
+      router.push(`/decks/new?format=vcr&race=${encodeURIComponent(selectedRace)}`)
     }
   }
 
@@ -123,28 +126,43 @@ export default function FormatSelectPage() {
                 </div>
 
                 {/* Próximamente - Imperio VCR */}
-                <div className="p-6 rounded-lg border-2 border-[#2D9B96]/30 bg-[#1A2332]/50 opacity-50">
+                <button
+                  onClick={() => setSelectedFormat('vcr')}
+                  className={`p-6 rounded-lg border-2 transition-all text-left ${
+                    selectedFormat === 'vcr'
+                      ? 'bg-[#2D9B96]/20 border-[#2D9B96] shadow-lg'
+                      : 'bg-[#1A2332] border-[#2D9B96]/50 hover:border-[#2D9B96]'
+                  }`}
+                >
                   <div className="flex items-start gap-4">
-                    <div className="text-4xl">🔒</div>
+                    <div className="text-4xl">👑</div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-[#A0A0A0] mb-2">
+                      <h3 className="text-xl font-bold text-[#F4C430] mb-2">
                         Imperio VCR
                       </h3>
-                      <p className="text-[#707070] mb-2">
+                      <p className="text-[#E8E8E8] mb-2">
                         Formato Vasallo, Cortesano y Real - construye tu mazo con restricciones de rareza.
                       </p>
-                      <div className="text-[#707070] text-sm">
-                        Próximamente...
+                      <div className="text-[#2D9B96] text-sm">
+                        • 50 cartas en el mazo principal<br/>
+                        • 15 cartas en el mazo de refuerzo (opcional)<br/>
+                        • Mínimo 17 cartas entre Aliados, Armas y Tótems<br/>
+                        • Solo cartas de rareza Vasallo, Cortesano y Real<br/>
+                        • Mismas razas que Imperio Racial (elige raza en el siguiente paso)<br/>
+                        • Banlist VCR aplicada
                       </div>
                     </div>
+                    {selectedFormat === 'vcr' && (
+                      <div className="text-[#2D9B96] text-2xl">✓</div>
+                    )}
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Paso 2: Seleccionar Raza (solo visible si se seleccionó formato) */}
-          {selectedFormat === 'racial' && (
+          {/* Paso 2: Seleccionar Raza (visible para Imperio Racial e Imperio VCR) */}
+          {(selectedFormat === 'racial' || selectedFormat === 'vcr') && (
             <div className="mb-8 animate-fade-in">
               <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -159,7 +177,9 @@ export default function FormatSelectPage() {
                 </div>
 
                 <p className="text-[#A0A0A0] mb-6 text-sm sm:text-base">
-                  Elige la raza que definirá los aliados de tu mazo
+                  {selectedFormat === 'vcr'
+                    ? 'En VCR también construyes por raza. Elige la raza que definirá los aliados de tu mazo.'
+                    : 'Elige la raza que definirá los aliados de tu mazo'}
                 </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -203,7 +223,7 @@ export default function FormatSelectPage() {
           )}
 
           {/* Botón Continuar */}
-          {selectedFormat === 'racial' && selectedRace && (
+          {selectedFormat && selectedRace ? (
             <div className="flex justify-center animate-fade-in">
               <button
                 onClick={handleContinue}
@@ -212,7 +232,7 @@ export default function FormatSelectPage() {
                 Continuar al Constructor de Mazos →
               </button>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

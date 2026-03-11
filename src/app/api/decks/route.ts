@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth()
     
     const body = await request.json()
-    const { name, description, cards, sideboard, race, is_public } = body
+    const { name, description, cards, sideboard, race, is_public, format: formatParam } = body
 
     if (!name) {
       return NextResponse.json(
@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const format = formatParam === 'VCR' ? 'VCR' : 'Imperio Racial'
+
     if (!race) {
       return NextResponse.json(
         { error: 'La raza del mazo es requerida' },
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Preparar arrays JSONB de cartas
+    // Fecha actual para created_at y updated_at
     const cardsArray: DeckCardEntry[] = (cards || []).map((card: any) => ({
       card_id: card.id,
       quantity: card.quantity || 1
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
         description,
         user_id: user.id,
         race,
-        format: 'Imperio Racial',
+        format,
         is_public: is_public || false,
         cards: cardsArray,
         sideboard: sideboardArray,

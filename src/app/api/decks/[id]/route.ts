@@ -139,7 +139,7 @@ export async function PUT(
     const { id } = await params
     
     const body = await request.json()
-    const { name, description, cards, sideboard, race, is_public } = body
+    const { name, description, cards, sideboard, race, is_public, format: formatParam } = body
 
     if (!name) {
       return NextResponse.json(
@@ -147,6 +147,8 @@ export async function PUT(
         { status: 400 }
       )
     }
+
+    const format = formatParam === 'VCR' ? 'VCR' : 'Imperio Racial'
 
     if (!race) {
       return NextResponse.json(
@@ -201,6 +203,7 @@ export async function PUT(
         name,
         description,
         race,
+        format,
         is_public: is_public || false,
         cards: cardsArray,
         sideboard: sideboardArray,

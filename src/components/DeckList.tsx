@@ -3,7 +3,8 @@
 import { DeckWithCards } from '@/types'
 import Link from 'next/link'
 import Swal from 'sweetalert2'
-import { formatDate } from '@/lib/utils'
+import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
+import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
 
 interface DeckListProps {
   decks: DeckWithCards[]
@@ -96,7 +97,11 @@ export function DeckList({ decks, onDelete }: DeckListProps) {
                 src={`/razas/${deck.race}.png`} 
                 alt={deck.race}
                 className="absolute inset-0 w-full h-full object-cover opacity-20"
-                style={deck.race === 'Sombra' ? { objectPosition: '50% 10%' } : undefined}
+                style={
+                  RACE_IMAGE_POSITION[deck.race]
+                    ? { objectPosition: RACE_IMAGE_POSITION[deck.race] }
+                    : undefined
+                }
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                 }}
@@ -106,14 +111,14 @@ export function DeckList({ decks, onDelete }: DeckListProps) {
             {/* Contenido sobre la imagen */}
             <div className="relative z-10">
               <h3 className="text-xl font-bold text-[#F4C430] mb-1 drop-shadow-lg">{deck.name}</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {deck.race && (
                   <span className="text-xs bg-[#0A0E1A] text-[#F4C430] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
                     {deck.race}
                   </span>
                 )}
-                <span className="text-xs text-[#4ECDC4] font-medium">
-                  {deck.format || 'Imperio Racial'}
+                <span className="text-xs bg-[#0A0E1A] text-[#4ECDC4] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
+                  {getFormatDisplayLabel(deck.format)}
                 </span>
               </div>
             </div>

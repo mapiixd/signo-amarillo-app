@@ -8,7 +8,8 @@ import Footer from '@/components/Footer'
 import html2canvas from 'html2canvas'
 import Swal from 'sweetalert2'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { formatDate } from '@/lib/utils'
+import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
+import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
 
 interface DeckWithLikes extends DeckWithCards {
   likes_count?: number
@@ -754,7 +755,11 @@ export default function DeckViewPage() {
                   src={`/razas/${deck.race}.png`} 
                   alt={deck.race}
                   className="absolute inset-0 w-full h-full object-cover opacity-20"
-                  style={deck.race === 'Sombra' ? { objectPosition: '50% 15%' } : undefined}
+                  style={
+                    RACE_IMAGE_POSITION[deck.race]
+                      ? { objectPosition: RACE_IMAGE_POSITION[deck.race] }
+                      : undefined
+                  }
                   onError={(e) => {
                     e.currentTarget.style.display = 'none'
                   }}
@@ -776,8 +781,8 @@ export default function DeckViewPage() {
                         {deck.race}
                       </span>
                     )}
-                    <span className="text-[#4ECDC4] font-medium">
-                      {deck.format || 'Imperio Racial'}
+                    <span className="bg-[#0A0E1A] text-[#4ECDC4] px-3 py-1 rounded-full font-medium border border-[#2D9B96]">
+                      {getFormatDisplayLabel(deck.format)}
                     </span>
                     <span className="text-[#A0A0A0]">
                       Creada: {formatDate(deck.created_at)}
@@ -962,7 +967,7 @@ export default function DeckViewPage() {
               {deck.race && (
                 <span><span className="text-[#4ECDC4]">Raza:</span> {deck.race}</span>
               )}
-              <span><span className="text-[#4ECDC4]">Formato:</span> {deck.format || 'Imperio Racial'}</span>
+              <span><span className="text-[#4ECDC4]">Formato:</span> {getFormatDisplayLabel(deck.format)}</span>
               <span><span className="text-[#4ECDC4]">Fecha:</span> {new Date(deck.created_at).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
                 month: 'long', 

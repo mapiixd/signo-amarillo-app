@@ -58,3 +58,13 @@ export function formatDate(isoDateString: string): string {
     return ''
   }
 }
+
+/**
+ * Etiqueta corta del formato para mostrar en cards (VCR, Imperio, Triadas).
+ */
+export function getFormatDisplayLabel(format: string | null | undefined): string {
+  if (!format) return 'Imperio'
+  if (format === 'VCR') return 'VCR'
+  if (format === 'Triadas') return 'Triadas'
+  return 'Imperio'
+}
