@@ -148,7 +148,7 @@ export async function PUT(
       )
     }
 
-    const format = formatParam === 'VCR' ? 'VCR' : 'Imperio Racial'
+    const format = formatParam === 'VCR' ? 'VCR' : formatParam === 'Triadas' ? 'Triadas' : 'Imperio Racial'
 
     if (!race) {
       return NextResponse.json(

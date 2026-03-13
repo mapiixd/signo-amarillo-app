@@ -12,5 +12,8 @@ export const RACE_IMAGE_POSITION: Record<string, string> = {
   Guerrero: '50% 15%',
   Héroe: '50% 15%',
   Sacerdote: '50% 20%',
-  Sombra: '50% 25%'
+  Sombra: '50% 25%',
+  Tenebris: '50% 25%',
+  Paladín: '50% 40%',
+  Desafiante: '50% 10%'
 }

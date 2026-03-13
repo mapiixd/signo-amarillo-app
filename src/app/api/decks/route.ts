@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
+import { getCurrentSeason } from '@/lib/season'
 import type { DeckCardEntry } from '@/types'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const format = formatParam === 'VCR' ? 'VCR' : 'Imperio Racial'
+    const format = formatParam === 'VCR' ? 'VCR' : formatParam === 'Triadas' ? 'Triadas' : 'Imperio Racial'
 
     if (!race) {
       return NextResponse.json(
@@ -133,7 +134,8 @@ export async function POST(request: NextRequest) {
     // Fecha actual para created_at y updated_at
     const now = new Date().toISOString()
 
-    // Crear el deck con JSONB - 1 query simple!
+    const season = getCurrentSeason()
+
     const { data: deck, error: deckError } = await supabase
       .from('decks')
       .insert({
@@ -143,6 +145,7 @@ export async function POST(request: NextRequest) {
         race,
         format,
         is_public: is_public || false,
+        season,
         cards: cardsArray,
         sideboard: sideboardArray,
         created_at: now,

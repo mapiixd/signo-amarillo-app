@@ -30,6 +30,7 @@ export default function CommunityDecksPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<any>(null)
   const [sortBy, setSortBy] = useState<'likes' | 'recent' | 'name'>('recent')
+  const [selectedFormat, setSelectedFormat] = useState<string>('')
   const [selectedRace, setSelectedRace] = useState<string>('')
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set())
 
@@ -40,9 +41,8 @@ export default function CommunityDecksPage() {
   }, [])
 
   useEffect(() => {
-    // Recargar mazos cuando cambian los filtros o paginación
     fetchDecks()
-  }, [currentPage, sortBy, selectedRace])
+  }, [currentPage, sortBy, selectedFormat, selectedRace])
 
   const checkAuthentication = async () => {
     try {
@@ -80,6 +80,7 @@ export default function CommunityDecksPage() {
       params.append('page', currentPage.toString())
       params.append('limit', '20')
       params.append('sortBy', sortBy)
+      if (selectedFormat) params.append('format', selectedFormat)
       if (selectedRace) params.append('race', selectedRace)
 
       const response = await fetch(`/api/decks/community?${params.toString()}`, {
@@ -260,13 +261,16 @@ export default function CommunityDecksPage() {
   const races = [
     'Bestia',
     'Caballero',
+    'Desafiante',
     'Dragón',
     'Eterno',
     'Faerie',
     'Guerrero',
     'Héroe',
+    'Paladín',
     'Sacerdote',
-    'Sombra'
+    'Sombra',
+    'Tenebris'
   ]
 
   // Mostrar carga mientras se cargan los mazos
@@ -296,7 +300,7 @@ export default function CommunityDecksPage() {
 
         {/* Filtros */}
         <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-md p-4 sm:p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Ordenar por */}
             <div>
               <label className="block text-sm font-semibold text-[#F4C430] mb-2">
@@ -316,10 +320,30 @@ export default function CommunityDecksPage() {
               </select>
             </div>
 
+            {/* Filtrar por formato */}
+            <div>
+              <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                Formato:
+              </label>
+              <select
+                value={selectedFormat}
+                onChange={(e) => {
+                  setSelectedFormat(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+              >
+                <option value="">Todos los formatos</option>
+                <option value="Imperio">Imperio</option>
+                <option value="VCR">VCR</option>
+                <option value="Triadas">Triadas</option>
+              </select>
+            </div>
+
             {/* Filtrar por raza */}
             <div>
               <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                Filtrar por raza:
+                Raza:
               </label>
               <select
                 value={selectedRace}
@@ -329,7 +353,7 @@ export default function CommunityDecksPage() {
                 }}
                 className="w-full px-4 py-2.5 bg-[#0A0E1A] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
               >
-                <option value="">Todas las razas</option>
+                <option value="">Todas</option>
                 {races.map(race => (
                   <option key={race} value={race}>{race}</option>
                 ))}
@@ -389,6 +413,11 @@ export default function CommunityDecksPage() {
                         <span className="text-xs bg-[#0A0E1A] text-[#4ECDC4] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
                           {getFormatDisplayLabel(deck.format)}
                         </span>
+                        {deck.season && (
+                          <span className="text-xs bg-[#0A0E1A] text-[#A0A0A0] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
+                            {deck.season}
+                          </span>
+                        )}
                       </div>
                       {deck.user && (
                         <p className="text-xs text-[#A0A0A0] mt-2">

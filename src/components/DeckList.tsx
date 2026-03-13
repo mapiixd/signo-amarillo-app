@@ -120,6 +120,11 @@ export function DeckList({ decks, onDelete }: DeckListProps) {
                 <span className="text-xs bg-[#0A0E1A] text-[#4ECDC4] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
                   {getFormatDisplayLabel(deck.format)}
                 </span>
+                {deck.season && (
+                  <span className="text-xs bg-[#0A0E1A] text-[#A0A0A0] px-2 py-1 rounded-full font-medium border border-[#2D9B96]">
+                    {deck.season}
+                  </span>
+                )}
               </div>
             </div>
           </div>

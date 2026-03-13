@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const sortBy = searchParams.get('sortBy') || 'recent' // 'likes', 'recent', 'name'
     const race = searchParams.get('race') || ''
-    
+    const format = searchParams.get('format') || '' // 'Imperio', 'VCR', 'Triadas' o vacío = todos
+
     const offset = (page - 1) * limit
 
     // Construir query base
@@ -33,9 +34,13 @@ export async function GET(request: NextRequest) {
       `)
       .eq('is_public', true)
 
-    // Filtrar por raza si se especifica
     if (race) {
       query = query.eq('race', race)
+    }
+
+    if (format) {
+      const formatValue = format === 'Imperio' ? 'Imperio Racial' : format
+      query = query.eq('format', formatValue)
     }
 
     // Ordenar según el parámetro
@@ -68,6 +73,10 @@ export async function GET(request: NextRequest) {
 
     if (race) {
       countQuery = countQuery.eq('race', race)
+    }
+    if (format) {
+      const formatValue = format === 'Imperio' ? 'Imperio Racial' : format
+      countQuery = countQuery.eq('format', formatValue)
     }
 
     const { count: totalCount, error: countError } = await countQuery

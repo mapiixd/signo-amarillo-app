@@ -3,14 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Footer from '@/components/Footer'
+import { type TriadaName, TRIADAS, TRIADA_RACES } from '@/lib/triadas'
 
-type Format = 'racial' | 'vcr' | null
+type Format = 'racial' | 'vcr' | 'triadas' | null
 type Race = 'Bestia' | 'Caballero' | 'Dragón' | 'Eterno' | 'Faerie' | 'Guerrero' | 'Héroe' | 'Sacerdote' | 'Sombra' | null
 
 export default function FormatSelectPage() {
   const router = useRouter()
   const [selectedFormat, setSelectedFormat] = useState<Format>(null)
   const [selectedRace, setSelectedRace] = useState<Race>(null)
+  const [selectedTriada, setSelectedTriada] = useState<TriadaName | null>(null)
 
   useEffect(() => {
     document.title = 'Elegir Formato | El Signo Amarillo';
@@ -34,6 +36,9 @@ export default function FormatSelectPage() {
     }
     if (selectedFormat === 'vcr' && selectedRace) {
       router.push(`/decks/new?format=vcr&race=${encodeURIComponent(selectedRace)}`)
+    }
+    if (selectedFormat === 'triadas' && selectedTriada) {
+      router.push(`/decks/new?format=triadas&triada=${encodeURIComponent(selectedTriada)}`)
     }
   }
 
@@ -103,27 +108,39 @@ export default function FormatSelectPage() {
                   </div>
                 </button>
 
-                {/* Próximamente - Tríadas */}
-                <div className="p-6 rounded-lg border-2 border-[#2D9B96]/30 bg-[#1A2332]/50 opacity-50">
+                {/* Imperio Triadas */}
+                <button
+                  onClick={() => setSelectedFormat('triadas')}
+                  className={`p-6 rounded-lg border-2 transition-all text-left ${
+                    selectedFormat === 'triadas'
+                      ? 'bg-[#2D9B96]/20 border-[#2D9B96] shadow-lg'
+                      : 'bg-[#1A2332] border-[#2D9B96]/50 hover:border-[#2D9B96]'
+                  }`}
+                >
                   <div className="flex items-start gap-4">
-                    <div className="text-4xl">🔒</div>
+                    <div className="text-4xl">⚔️</div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-[#A0A0A0] mb-2">
-                        Tríadas
+                      <h3 className="text-xl font-bold text-[#F4C430] mb-2">
+                        Imperio Triadas
                       </h3>
-                      <p className="text-[#707070] mb-2">
-                        Construye tu mazo en una de las 3 facciones.
+                      <p className="text-[#E8E8E8] mb-2">
+                        Construye tu mazo en una de las 3 facciones (Triadas).
                       </p>
-                      <div className="text-[#707070] text-sm">
-                        <strong>Tenebris:</strong> Bestia, Dragón, Sombra<br/>
-                        <strong>Paladín:</strong> Caballero, Guerrero, Héroe<br/>
-                        <strong>Desafiante:</strong> Eterno, Faerie, Sacerdote<br/>
-                        <br/>
-                        Próximamente...
+                      <div className="text-[#2D9B96] text-sm">
+                        • 50 cartas en el mazo principal<br/>
+                        • 15 cartas en el mazo de refuerzo (opcional)<br/>
+                        • <strong>Paladín:</strong> Caballero, Guerrero, Héroe<br/>
+                        • <strong>Desafiante:</strong> Faerie, Eterno, Sacerdote<br/>
+                        • <strong>Tenebris:</strong> Bestia, Dragón, Sombra<br/>
+                        • Al menos un aliado de cada raza de tu Triada<br/>
+                        • Máximo 4 aliados sin raza (main) • Banlist Triadas + Imperio
                       </div>
                     </div>
+                    {selectedFormat === 'triadas' && (
+                      <div className="text-[#2D9B96] text-2xl">✓</div>
+                    )}
                   </div>
-                </div>
+                </button>
 
                 {/* Próximamente - Imperio VCR */}
                 <button
@@ -160,6 +177,53 @@ export default function FormatSelectPage() {
               </div>
             </div>
           </div>
+
+          {/* Paso 2: Seleccionar Triada (solo para Imperio Triadas) */}
+          {selectedFormat === 'triadas' && (
+            <div className="mb-8 animate-fade-in">
+              <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-lg p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                    selectedTriada ? 'bg-[#2D9B96] text-white' : 'bg-[#1A2332] text-[#F4C430]'
+                  }`}>
+                    2
+                  </div>
+                  <h2 className="text-2xl font-bold text-[#F4C430]">
+                    Seleccionar Triada
+                  </h2>
+                </div>
+                <p className="text-[#A0A0A0] mb-6 text-sm sm:text-base">
+                  Elige la facción (Triada) que definirá las razas de aliados permitidas en tu mazo.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {TRIADAS.map((t) => (
+                    <button
+                      key={t.name}
+                      onClick={() => setSelectedTriada(t.name)}
+                      className={`p-4 rounded-lg border-2 transition-all text-left hover:scale-105 relative ${
+                        selectedTriada === t.name
+                          ? 'bg-[#2D9B96]/20 border-[#2D9B96] shadow-lg'
+                          : 'bg-[#1A2332] border-[#2D9B96]/50 hover:border-[#2D9B96]'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center text-center">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 mb-3 rounded-full overflow-hidden border-2 border-[#2D9B96] flex items-center justify-center bg-[#0A0E1A]">
+                          <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
+                        </div>
+                        <h3 className="text-lg font-bold text-[#F4C430] mb-1">{t.name}</h3>
+                        <p className="text-xs text-[#A0A0A0]">
+                          {TRIADA_RACES[t.name].join(', ')}
+                        </p>
+                        {selectedTriada === t.name && (
+                          <div className="absolute top-2 right-2 bg-[#2D9B96] text-white rounded-full w-8 h-8 flex items-center justify-center">✓</div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Paso 2: Seleccionar Raza (visible para Imperio Racial e Imperio VCR) */}
           {(selectedFormat === 'racial' || selectedFormat === 'vcr') && (
@@ -223,7 +287,16 @@ export default function FormatSelectPage() {
           )}
 
           {/* Botón Continuar */}
-          {selectedFormat && selectedRace ? (
+          {selectedFormat === 'triadas' && selectedTriada ? (
+            <div className="flex justify-center animate-fade-in">
+              <button
+                onClick={handleContinue}
+                className="px-8 py-4 bg-[#2D9B96] text-white rounded-lg hover:bg-[#4ECDC4] transition-all font-bold text-lg shadow-lg hover:shadow-xl"
+              >
+                Continuar al Constructor de Mazos →
+              </button>
+            </div>
+          ) : selectedFormat && selectedRace ? (
             <div className="flex justify-center animate-fade-in">
               <button
                 onClick={handleContinue}

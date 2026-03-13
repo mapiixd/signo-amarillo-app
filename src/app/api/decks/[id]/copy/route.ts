@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
+import { getCurrentSeason } from '@/lib/season'
 import type { DeckCardEntry } from '@/types'
 
 // POST /api/decks/[id]/copy - Copiar un mazo público a los mazos del usuario
@@ -56,7 +57,8 @@ export async function POST(
         user_id: user.id,
         race: originalDeck.race,
         format: originalDeck.format,
-        is_public: false, // La copia es privada por defecto
+        is_public: false,
+        season: getCurrentSeason(), // La copia pertenece a la temporada actual
         cards: originalDeck.cards || [],
         sideboard: originalDeck.sideboard || [],
         created_at: now,

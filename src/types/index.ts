@@ -55,6 +55,7 @@ export type Deck = {
   race: string | null  // Raza del mazo (Imperio Racial)
   format: string  // 'Imperio Racial', etc.
   is_public: boolean
+  season: string | null  // Temporada en la que se creó (ej: KvM: Titanes). NULL = mazos antiguos.
   cards: DeckCardEntry[]  // Array JSONB de cartas del mazo principal
   sideboard: DeckCardEntry[]  // Array JSONB de cartas del sideboard
   created_at: string

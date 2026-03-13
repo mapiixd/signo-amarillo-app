@@ -784,6 +784,11 @@ export default function DeckViewPage() {
                     <span className="bg-[#0A0E1A] text-[#4ECDC4] px-3 py-1 rounded-full font-medium border border-[#2D9B96]">
                       {getFormatDisplayLabel(deck.format)}
                     </span>
+                    {deck.season && (
+                      <span className="bg-[#0A0E1A] text-[#A0A0A0] px-3 py-1 rounded-full font-medium border border-[#2D9B96]">
+                        {deck.season}
+                      </span>
+                    )}
                     <span className="text-[#A0A0A0]">
                       Creada: {formatDate(deck.created_at)}
                     </span>
@@ -968,6 +973,9 @@ export default function DeckViewPage() {
                 <span><span className="text-[#4ECDC4]">Raza:</span> {deck.race}</span>
               )}
               <span><span className="text-[#4ECDC4]">Formato:</span> {getFormatDisplayLabel(deck.format)}</span>
+              {deck.season && (
+                <span><span className="text-[#4ECDC4]">Temporada:</span> {deck.season}</span>
+              )}
               <span><span className="text-[#4ECDC4]">Fecha:</span> {new Date(deck.created_at).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
                 month: 'long', 

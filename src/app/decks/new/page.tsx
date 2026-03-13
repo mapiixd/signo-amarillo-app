@@ -6,6 +6,7 @@ import Swal from 'sweetalert2'
 import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
 import { getBanStatusIcon, getBanStatusLabel, type FormatType, type BanStatus } from '@/lib/banlist'
+import { getRacesForTriada, allyMatchesTriada, isTriadasExURSoloPromo, type TriadaName } from '@/lib/triadas'
 import Footer from '@/components/Footer'
 
 interface SelectedCard {
@@ -27,7 +28,9 @@ function NewDeckPageContent() {
   const searchParams = useSearchParams()
   const raceParam = searchParams.get('race')
   const formatParam = searchParams.get('format')
+  const triadaParam = searchParams.get('triada') as TriadaName | null
   const isVCRFormat = formatParam === 'vcr'
+  const isTriadasFormat = formatParam === 'triadas'
 
   const [name, setName] = useState('')
   const [isPublic, setIsPublic] = useState(true)
@@ -40,7 +43,7 @@ function NewDeckPageContent() {
   const [abilityFilter, setAbilityFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('Todas')
   const [expansionFilter, setExpansionFilter] = useState<string>('Todas')
-  const [deckRace, setDeckRace] = useState<string>(raceParam || '')
+  const [deckRace, setDeckRace] = useState<string>(triadaParam || raceParam || '')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'main' | 'sidedeck'>('main')
   const [selectedCardForView, setSelectedCardForView] = useState<CardType | null>(null)
@@ -52,7 +55,7 @@ function NewDeckPageContent() {
   const prevMainDeckLengthRef = useRef<number>(0)
   const prevSideboardLengthRef = useRef<number>(0)
   const modalHistoryPushedRef = useRef<boolean>(false)
-  const STORAGE_KEY = isVCRFormat ? 'deck-builder-draft-vcr' : 'deck-builder-draft'
+  const STORAGE_KEY = isTriadasFormat ? 'deck-builder-draft-triadas' : isVCRFormat ? 'deck-builder-draft-vcr' : 'deck-builder-draft'
 
   // Funciones para guardar y cargar el progreso
   const saveProgress = useCallback(() => {
@@ -71,7 +74,7 @@ function NewDeckPageContent() {
           quantity: sc.quantity
         })),
         deckRace,
-        deckFormat: isVCRFormat ? 'vcr' : 'racial',
+        deckFormat: isTriadasFormat ? 'triadas' : isVCRFormat ? 'vcr' : 'racial',
         timestamp: Date.now()
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
@@ -85,9 +88,9 @@ function NewDeckPageContent() {
 
       const progress = JSON.parse(saved)
       
-      // Verificar que el progreso guardado sea del mismo formato y raza
+      // Verificar que el progreso guardado sea del mismo formato y raza/triada
       const savedFormat = progress.deckFormat || 'racial'
-      const currentFormat = isVCRFormat ? 'vcr' : 'racial'
+      const currentFormat = isTriadasFormat ? 'triadas' : isVCRFormat ? 'vcr' : 'racial'
       if (savedFormat !== currentFormat || progress.deckRace !== deckRace) {
         localStorage.removeItem(STORAGE_KEY)
         return false
@@ -157,7 +160,7 @@ function NewDeckPageContent() {
       localStorage.removeItem(STORAGE_KEY)
       return false
     }
-  }, [cards, deckRace, isVCRFormat, STORAGE_KEY])
+  }, [cards, deckRace, isVCRFormat, isTriadasFormat, STORAGE_KEY])
 
   const clearProgress = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
@@ -173,7 +176,7 @@ function NewDeckPageContent() {
   // Cargar progreso guardado al montar el componente (solo una vez)
   const hasLoadedProgressRef = useRef(false)
   useEffect(() => {
-    if (!loading && cards.length > 0 && (raceParam || formatParam === 'vcr') && !hasLoadedProgressRef.current) {
+    if (!loading && cards.length > 0 && (raceParam || formatParam === 'vcr' || (formatParam === 'triadas' && triadaParam)) && !hasLoadedProgressRef.current) {
       hasLoadedProgressRef.current = true
       loadProgress().then(hasProgress => {
         if (hasProgress) {
@@ -190,7 +193,7 @@ function NewDeckPageContent() {
         }
       })
     }
-  }, [loading, cards.length, raceParam, formatParam, loadProgress])
+  }, [loading, cards.length, raceParam, formatParam, triadaParam, loadProgress])
 
   // Interceptar navegación hacia atrás para guardar progreso
   useEffect(() => {
@@ -242,12 +245,14 @@ function NewDeckPageContent() {
     }
   }, [selectedCardForView])
 
-  // Redirigir si no hay raza (Imperio Racial y VCR son formatos raciales; siempre se requiere raza)
+  // Redirigir si no hay raza o triada según el formato
   useEffect(() => {
-    if (!raceParam) {
+    if (isTriadasFormat && !triadaParam) {
+      router.push('/decks/format-select')
+    } else if (!isTriadasFormat && !raceParam) {
       router.push('/decks/format-select')
     }
-  }, [raceParam, router])
+  }, [raceParam, triadaParam, isTriadasFormat, router])
 
   useEffect(() => {
     fetchCards()
@@ -272,10 +277,20 @@ function NewDeckPageContent() {
         const data = await response.json()
         const entries: any[] = data.entries || []
         
-        // VCR aplica restricciones de VCR + Imperio Racial (la más restrictiva gana)
-        const formatsToApply: FormatType[] = isVCRFormat ? ['VCR', 'Imperio Racial'] : ['Imperio Racial']
+        // VCR: VCR + Imperio Racial. Triadas: Triadas + Imperio Racial (y máximo 2 copias por defecto)
+        const formatsToApply: FormatType[] = isTriadasFormat
+          ? ['Triadas', 'Imperio Racial']
+          : isVCRFormat
+            ? ['VCR', 'Imperio Racial']
+            : ['Imperio Racial']
         const banlistMap = new Map<string, { status: BanStatus; maxCopies: number }>()
-        
+        const defaultMaxCopies = isTriadasFormat ? 2 : 3
+
+        // Triadas: nombres que tienen al menos una versión Ultra Real → máximo 1 copia (salvo ex-UR solo promocional → 2 copias)
+        const ultraRealCardNames = isTriadasFormat
+          ? new Set(cards.filter(c => c.rarity === 'ULTRA_REAL' && !isTriadasExURSoloPromo(c.name)).map(c => c.name))
+          : new Set<string>()
+
         entries.forEach((entry: any) => {
           if (!formatsToApply.includes(entry.format as FormatType)) return
           const normalizedName = entry.card_name.trim().toLowerCase()
@@ -286,7 +301,6 @@ function NewDeckPageContent() {
             banlistMap.set(normalizedName, { status, maxCopies })
             return
           }
-          // Combinar: prohibida si lo está en alguno; si no, menor maxCopies
           if (status === 'banned' || existing.status === 'banned') {
             banlistMap.set(normalizedName, { status: 'banned', maxCopies: 0 })
             return
@@ -295,12 +309,17 @@ function NewDeckPageContent() {
           const mergedStatus: BanStatus = minCopies === 1 ? 'limited-1' : minCopies === 2 ? 'limited-2' : 'allowed'
           banlistMap.set(normalizedName, { status: mergedStatus, maxCopies: minCopies })
         })
-        
-        // Mapear cada carta a su estado de banlist
+
         cards.forEach(card => {
           const normalizedName = card.name.trim().toLowerCase()
-          const banlistEntry = banlistMap.get(normalizedName)
-          cache[card.name] = banlistEntry || null
+          let banlistEntry = banlistMap.get(normalizedName) || null
+          if (isTriadasFormat) {
+            if (ultraRealCardNames.has(card.name)) {
+              banlistEntry = banlistEntry?.status === 'banned' ? banlistEntry : { status: 'limited-1' as BanStatus, maxCopies: 1 }
+            } else if (!banlistEntry) banlistEntry = { status: 'allowed' as BanStatus, maxCopies: defaultMaxCopies }
+            else if (banlistEntry.status !== 'banned') banlistEntry = { ...banlistEntry, maxCopies: Math.min(banlistEntry.maxCopies, defaultMaxCopies) }
+          }
+          cache[card.name] = banlistEntry
         })
         
         setBanlistCache(cache)
@@ -310,7 +329,7 @@ function NewDeckPageContent() {
     }
     
     loadBanlistForCards()
-  }, [cards, isVCRFormat])
+  }, [cards, isVCRFormat, isTriadasFormat])
 
   // Auto-scroll solo cuando se agrega una nueva carta al mazo principal (no cuando se modifica cantidad)
   useEffect(() => {
@@ -400,7 +419,7 @@ function NewDeckPageContent() {
     }
     
     // Validar si la carta está prohibida en el formato (usar cache)
-    const format: FormatType = isVCRFormat ? 'VCR' : 'Imperio Racial'
+    const format: FormatType = isTriadasFormat ? 'Triadas' : isVCRFormat ? 'VCR' : 'Imperio Racial'
     const banStatus = banlistCache[card.name] || null
     const isBanned = banStatus?.status === 'banned'
 
@@ -430,9 +449,8 @@ function NewDeckPageContent() {
       return
     }
     
-    // Validar límite de copias según banlist (puede ser 1, 2 o 3)
-    // IMPORTANTE: Las restricciones de banlist se aplican por nombre, no por versión específica
-    const maxAllowed = banStatus?.maxCopies ?? 3
+    // Validar límite de copias según banlist (Triadas: máx 2 por defecto; Ultra Real en banlist = 1)
+    const maxAllowed = banStatus?.maxCopies ?? (isTriadasFormat ? 2 : 3)
     if (totalInBothDecks >= maxAllowed) {
       const statusText = banStatus ? getBanStatusLabel(banStatus.status, banStatus.maxCopies) : ''
       
@@ -566,7 +584,7 @@ function NewDeckPageContent() {
         body: JSON.stringify({
           name,
           race: deckRace,
-          format: isVCRFormat ? 'VCR' : 'Imperio Racial',
+          format: isTriadasFormat ? 'Triadas' : isVCRFormat ? 'VCR' : 'Imperio Racial',
           is_public: isPublic,
           cards: selectedCards.map(sc => ({
             id: sc.card.id,
@@ -637,13 +655,29 @@ function NewDeckPageContent() {
       return `Debes tener al menos 17 cartas entre Aliados, Armas y Tótems. Actualmente tienes ${allyWeaponTotemCount}.`
     }
     
-    // Validar máximo 4 aliados sin raza (Imperio Racial y VCR son formatos raciales)
+    // Validar máximo 4 aliados sin raza (Imperio Racial, VCR y Triadas)
     const alliesWithoutRace = selectedCards
       .filter(sc => isRaceless(sc.card))
       .reduce((sum, sc) => sum + sc.quantity, 0)
 
     if (alliesWithoutRace > 4) {
       return `No puedes tener más de 4 aliados sin raza en el mazo principal. Actualmente tienes ${alliesWithoutRace}.`
+    }
+
+    // Triadas: al menos un aliado de cada raza de la Triada en el mazo principal
+    if (isTriadasFormat && deckRace) {
+      const requiredRaces = getRacesForTriada(deckRace as TriadaName)
+      const mainDeckRaces = new Set<string>()
+      selectedCards.forEach(sc => {
+        if (sc.card.type === 'ALIADO' && sc.card.race?.trim()) {
+          const r = sc.card.race.trim()
+          if (r !== 'Sin Raza') requiredRaces.forEach(race => { if (r.includes(race)) mainDeckRaces.add(race) })
+        }
+      })
+      const missing = requiredRaces.filter(race => !mainDeckRaces.has(race))
+      if (missing.length > 0) {
+        return `En Triadas debes tener al menos un aliado de cada raza de tu facción. Faltan: ${missing.join(', ')}.`
+      }
     }
 
     return null
@@ -673,16 +707,15 @@ function NewDeckPageContent() {
         if (!allowedRarities.includes(card.rarity)) return false
       }
 
-      // Filtro por raza del mazo (Imperio Racial y VCR): si es aliado, solo de la raza del mazo o sin raza
+      // Filtro por raza/triada: si es aliado, solo razas permitidas o sin raza
       let matchesRace = true
       if (card.type === 'ALIADO') {
         const cardRace = card.race?.trim() || ''
-
-        // Siempre incluir cartas "Sin Raza" o sin raza definida
         if (cardRace === '' || cardRace === 'Sin Raza') {
           matchesRace = true
+        } else if (isTriadasFormat) {
+          matchesRace = allyMatchesTriada(cardRace, deckRace as TriadaName)
         } else {
-          // Si el aliado tiene raza específica, debe CONTENER la raza del mazo (para soportar multi-raza)
           matchesRace = cardRace.includes(deckRace)
         }
       }
@@ -757,12 +790,14 @@ function NewDeckPageContent() {
             ← Volver
           </button>
           <h1 className="text-3xl font-bold text-[#F4C430] mb-2">
-            {isVCRFormat ? 'Constructor de Mazos - Imperio VCR' : `Constructor de Mazos - Raza: ${deckRace}`}
+            {isTriadasFormat ? `Constructor de Mazos - Triadas (${deckRace})` : isVCRFormat ? 'Constructor de Mazos - Imperio VCR' : `Constructor de Mazos - Raza: ${deckRace}`}
           </h1>
           <p className="text-[#2D9B96] text-sm mb-1">
-            {isVCRFormat
-              ? `Formato: Imperio VCR | Raza: ${deckRace} | Solo cartas Vasallo, Cortesano y Real | Banlist VCR`
-              : `Formato: Imperio Racial | Solo se mostrarán aliados de raza ${deckRace} o sin raza`}
+            {isTriadasFormat
+              ? `Formato: Imperio Triadas | Facción: ${deckRace} | Banlist Triadas + Imperio | Máx 2 copias (Ultra Real: 1)`
+              : isVCRFormat
+                ? `Formato: Imperio VCR | Raza: ${deckRace} | Solo cartas Vasallo, Cortesano y Real | Banlist VCR`
+                : `Formato: Imperio Racial | Solo se mostrarán aliados de raza ${deckRace} o sin raza`}
           </p>
           <p className="text-[#F4C430] text-xs italic">
           📋 Rotación activa: Espíritu Samurai - KvsM : Titanes
@@ -899,8 +934,8 @@ function NewDeckPageContent() {
                       </div>
                     )}
                     
-                    {/* Badge de banlist (limitada) */}
-                    {banStatus && banStatus.status !== 'banned' && !isUniqueCard && (
+                    {/* Badge de banlist (limitada): en Triadas no mostrar para límite 2, solo para límite 1 (Ultra Real) */}
+                    {banStatus && banStatus.status !== 'banned' && !isUniqueCard && (!isTriadasFormat || banStatus.maxCopies === 1) && (
                       <div className="absolute -top-1 -left-1 sm:-top-2 sm:-left-2 bg-yellow-500 text-black rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm shadow-lg border-2 border-yellow-600 z-20" title={getBanStatusLabel(banStatus.status, banStatus.maxCopies)}>
                         {getBanStatusIcon(banStatus.status)}
                       </div>
@@ -919,10 +954,10 @@ function NewDeckPageContent() {
                         isBanned ? 'text-red-400' : 'text-white'
                       }`}>
                         {isUniqueCard && <span className="mr-1 text-purple-400">⭐</span>}
-                        {banStatus && !isBanned && !isUniqueCard && <span className="mr-1">{getBanStatusIcon(banStatus.status)}</span>}
+                        {banStatus && !isBanned && !isUniqueCard && (!isTriadasFormat || banStatus.maxCopies === 1) && <span className="mr-1">{getBanStatusIcon(banStatus.status)}</span>}
                         {card.name}
                         {isUniqueCard && <span className="ml-1 text-purple-400">(1)</span>}
-                        {!isUniqueCard && banStatus && banStatus.maxCopies < 3 && !isBanned && (
+                        {!isUniqueCard && banStatus && banStatus.maxCopies < 3 && !isBanned && (!isTriadasFormat || banStatus.maxCopies === 1) && (
                           <span className="ml-1 text-yellow-400">({banStatus.maxCopies})</span>
                         )}
                       </p>
