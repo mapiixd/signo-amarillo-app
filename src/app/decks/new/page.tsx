@@ -260,7 +260,6 @@ function NewDeckPageContent() {
       if (cards.length === 0) return
 
       try {
-        const format: FormatType = isVCRFormat ? 'VCR' : 'Imperio Racial'
         const cache: Record<string, { status: BanStatus; maxCopies: number } | null> = {}
         
         // Cargar todas las banlists desde la API una sola vez (ruta pública)
@@ -273,17 +272,28 @@ function NewDeckPageContent() {
         const data = await response.json()
         const entries: any[] = data.entries || []
         
-        // Crear un mapa de banlist por nombre de carta (normalizado) para el formato específico
+        // VCR aplica restricciones de VCR + Imperio Racial (la más restrictiva gana)
+        const formatsToApply: FormatType[] = isVCRFormat ? ['VCR', 'Imperio Racial'] : ['Imperio Racial']
         const banlistMap = new Map<string, { status: BanStatus; maxCopies: number }>()
         
         entries.forEach((entry: any) => {
-          if (entry.format === format) {
-            const normalizedName = entry.card_name.trim().toLowerCase()
-            banlistMap.set(normalizedName, {
-              status: entry.status as BanStatus,
-              maxCopies: entry.max_copies
-            })
+          if (!formatsToApply.includes(entry.format as FormatType)) return
+          const normalizedName = entry.card_name.trim().toLowerCase()
+          const status = entry.status as BanStatus
+          const maxCopies = entry.max_copies ?? 3
+          const existing = banlistMap.get(normalizedName)
+          if (!existing) {
+            banlistMap.set(normalizedName, { status, maxCopies })
+            return
           }
+          // Combinar: prohibida si lo está en alguno; si no, menor maxCopies
+          if (status === 'banned' || existing.status === 'banned') {
+            banlistMap.set(normalizedName, { status: 'banned', maxCopies: 0 })
+            return
+          }
+          const minCopies = Math.min(existing.maxCopies, maxCopies)
+          const mergedStatus: BanStatus = minCopies === 1 ? 'limited-1' : minCopies === 2 ? 'limited-2' : 'allowed'
+          banlistMap.set(normalizedName, { status: mergedStatus, maxCopies: minCopies })
         })
         
         // Mapear cada carta a su estado de banlist
