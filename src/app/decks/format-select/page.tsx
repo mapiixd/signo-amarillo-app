@@ -142,7 +142,7 @@ export default function FormatSelectPage() {
                   </div>
                 </button>
 
-                {/* Próximamente - Imperio VCR */}
+                
                 <button
                   onClick={() => setSelectedFormat('vcr')}
                   className={`p-6 rounded-lg border-2 transition-all text-left ${
