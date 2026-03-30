@@ -165,6 +165,7 @@ export default function BanlistPage() {
               rarity: 'VASALLO' as any,
               race: null,
               expansion: '',
+              game: 'Imperio',
               is_active: true,
               created_at: '',
               updated_at: '',
