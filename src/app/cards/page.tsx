@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Card as CardType, CARD_TYPE_LABELS } from '@/types'
+import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { Card } from '@/components/Card'
 import Footer from '@/components/Footer'
 
@@ -27,6 +27,7 @@ export default function CardsPage() {
   const [costFilter, setCostFilter] = useState('')
   const [attackFilter, setAttackFilter] = useState('')
   const [raceFilter, setRaceFilter] = useState('')
+  const [rarityFilter, setRarityFilter] = useState('')
   const [abilityText, setAbilityText] = useState('')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [page, setPage] = useState(1)
@@ -62,6 +63,7 @@ export default function CardsPage() {
         setCostFilter(state.costFilter || '')
         setAttackFilter(state.attackFilter || '')
         setRaceFilter(state.raceFilter || '')
+        setRarityFilter(state.rarityFilter || '')
         setAbilityText(state.abilityText || '')
         setShowAdvancedFilters(state.showAdvancedFilters || false)
         setPage(state.page || 1)
@@ -93,12 +95,13 @@ export default function CardsPage() {
       costFilter,
       attackFilter,
       raceFilter,
+      rarityFilter,
       abilityText,
       showAdvancedFilters,
       page
     }
     sessionStorage.setItem('cardsPageState', JSON.stringify(state))
-  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, abilityText, showAdvancedFilters, page])
+  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, rarityFilter, abilityText, showAdvancedFilters, page])
 
   // Guardar estado cuando cambian los filtros
   useEffect(() => {
@@ -140,7 +143,7 @@ export default function CardsPage() {
       sessionStorage.removeItem('cardsPageState')
     }
     fetchCards()
-  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, abilityText])
+  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, rarityFilter, abilityText])
 
   useEffect(() => {
     // Actualizar las cartas mostradas cuando cambia la página
@@ -215,6 +218,7 @@ export default function CardsPage() {
       if (costFilter) params.append('cost', costFilter)
       if (attackFilter) params.append('attack', attackFilter)
       if (raceFilter) params.append('race', raceFilter)
+      if (rarityFilter) params.append('rarity', rarityFilter)
       if (abilityText) params.append('ability', abilityText)
 
       const response = await fetch(`/api/cards?${params.toString()}`)
@@ -336,6 +340,22 @@ export default function CardsPage() {
                       <option value="4">4</option>
                       <option value="5">5</option>
                       <option value="6+">6 o más</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
+                      Rareza
+                    </label>
+                    <select
+                      value={rarityFilter}
+                      onChange={(e) => setRarityFilter(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
+                    >
+                      <option value="">Todas las rarezas</option>
+                      {Object.entries(RARITY_TYPE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
                     </select>
                   </div>
 

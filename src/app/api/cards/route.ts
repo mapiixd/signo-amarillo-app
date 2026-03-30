@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const cost = searchParams.get('cost')
     const attack = searchParams.get('attack')
     const race = searchParams.get('race')
+    const rarity = searchParams.get('rarity')
     const ability = searchParams.get('ability')
     const rotation = searchParams.get('rotation') // 'true' para filtrar por rotación
 
@@ -56,6 +57,10 @@ export async function GET(request: NextRequest) {
 
       if (expansion) {
         query = query.eq('expansion', expansion)
+      }
+
+      if (rarity) {
+        query = query.eq('rarity', rarity)
       }
 
       // Filtro de coste

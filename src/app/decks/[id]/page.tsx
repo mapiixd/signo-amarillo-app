@@ -1,15 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { DeckWithCards, Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
 import Footer from '@/components/Footer'
-import html2canvas from 'html2canvas'
 import Swal from 'sweetalert2'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
 import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
+
+const DeckCostChart = dynamic(() => import('@/components/DeckCostChart'), { ssr: false })
 
 interface DeckWithLikes extends DeckWithCards {
   likes_count?: number
@@ -436,6 +437,7 @@ export default function DeckViewPage() {
     setExporting(true)
     
     try {
+      const html2canvas = (await import('html2canvas')).default
       // Detectar Safari en iOS para usar configuración optimizada (sin servidor)
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -1275,72 +1277,11 @@ export default function DeckViewPage() {
           </>
         )}
 
-        {/* Gráfico de curva de costes */}
+        {/* Gráfico de curva de costes (cargado bajo demanda para mejorar LCP) */}
         {activeTab === 'main' && prepareChartData.length > 0 && (
           <div className="mt-6 bg-[#0F1419] border border-[#2D9B96] rounded-xl overflow-visible p-3 sm:p-4 md:p-6">
             <h3 className="text-lg sm:text-xl font-bold text-[#F4C430] mb-3 sm:mb-4">Curva de Costes</h3>
-            <div className="w-full overflow-visible" style={{ minHeight: '250px' }}>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  data={prepareChartData}
-                  margin={{ 
-                    top: 10, 
-                    right: 10, 
-                    left: 0, 
-                    bottom: 40 
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2D9B96" opacity={0.3} />
-                  <XAxis 
-                    dataKey="coste" 
-                    stroke="#4ECDC4"
-                    tick={{ fill: '#4ECDC4', fontSize: 12 }}
-                    label={{ 
-                      value: 'Coste', 
-                      position: 'insideBottom', 
-                      offset: 0, 
-                      fill: '#4ECDC4',
-                      style: { fontSize: '12px' }
-                    }}
-                  />
-                  <YAxis 
-                    stroke="#4ECDC4"
-                    tick={{ fill: '#4ECDC4', fontSize: 12 }}
-                    label={{ 
-                      value: 'Cantidad', 
-                      angle: -90, 
-                      position: 'insideLeft', 
-                      fill: '#4ECDC4',
-                      style: { fontSize: '12px' }
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0F1419',
-                      border: '1px solid #2D9B96',
-                      borderRadius: '8px',
-                      color: '#F4C430',
-                      fontSize: '12px'
-                    }}
-                    itemStyle={{ color: '#4ECDC4', fontSize: '12px' }}
-                    labelStyle={{ color: '#F4C430', fontWeight: 'bold', fontSize: '12px' }}
-                    position={{ x: 0, y: 200 }}
-                    allowEscapeViewBox={{ x: true, y: true }}
-                    offset={10}
-                  />
-                  <Legend
-                    wrapperStyle={{ color: '#4ECDC4', fontSize: '12px', paddingTop: '10px' }}
-                    iconSize={12}
-                    verticalAlign="top"
-                    align="center"
-                  />
-                  <Bar dataKey="Aliado" stackId="a" fill="#2D9B96" />
-                  <Bar dataKey="Arma" stackId="a" fill="#B8384E" />
-                  <Bar dataKey="Totem" stackId="a" fill="#1A7F5A" />
-                  <Bar dataKey="Talismán" stackId="a" fill="#8B4789" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DeckCostChart data={prepareChartData} />
           </div>
         )}
       </div>
