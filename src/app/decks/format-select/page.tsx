@@ -158,13 +158,13 @@ export default function FormatSelectPage() {
                         Imperio VCR
                       </h3>
                       <p className="text-[#E8E8E8] mb-2">
-                        Formato Vasallo, Cortesano y Real - construye tu mazo con restricciones de rareza.
+                        Formato Vasallo, Cortesano y Real - construye tu mazo con restricciones de rareza (excepción: Laterna promo).
                       </p>
                       <div className="text-[#2D9B96] text-sm">
                         • 50 cartas en el mazo principal<br/>
                         • 15 cartas en el mazo de refuerzo (opcional)<br/>
                         • Mínimo 17 cartas entre Aliados, Armas y Tótems<br/>
-                        • Solo cartas de rareza Vasallo, Cortesano y Real<br/>
+                        • Vasallo, Cortesano y Real; excepción vigente: Laterna (rareza Promo)<br/>
                         • Mismas razas que Imperio Racial (elige raza en el siguiente paso)<br/>
                         • Banlist VCR aplicada
                       </div>

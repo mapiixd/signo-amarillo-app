@@ -7,6 +7,7 @@ import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, DeckWithCards }
 import { getCardImageUrl } from '@/lib/cdn'
 import { getBanStatusIcon, getBanStatusLabel, type FormatType, type BanStatus } from '@/lib/banlist'
 import { getRacesForTriada, allyMatchesTriada, isTriadasExURSoloPromo, type TriadaName } from '@/lib/triadas'
+import { isVCRPermittedRarity } from '@/lib/vcr'
 import Footer from '@/components/Footer'
 
 interface SelectedCard {
@@ -792,9 +793,8 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
       const matchesType = typeFilter === 'Todas' || card.type === typeFilter
       const matchesExpansion = expansionFilter === 'Todas' || card.expansion === expansionFilter
 
-      if (deckFormat === 'VCR') {
-        const allowedRarities = ['VASALLO', 'CORTESANO', 'REAL']
-        if (!allowedRarities.includes(card.rarity)) return false
+      if (deckFormat === 'VCR' && !isVCRPermittedRarity(card)) {
+        return false
       }
 
       let matchesRace = true
@@ -885,7 +885,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
             {deckFormat === 'Triadas'
               ? `Formato: Imperio Triadas | Facción: ${deckRace} | Banlist Triadas + Imperio | Máx 2 copias (Ultra Real: 1)`
               : deckFormat === 'VCR'
-                ? `Formato: Imperio VCR | Raza: ${deckRace} | Solo cartas Vasallo, Cortesano y Real | Banlist VCR`
+                ? `Formato: Imperio VCR | Raza: ${deckRace} | Vasallo, Cortesano y Real (+ Laterna promo) | Banlist VCR`
                 : `Formato: Imperio Racial | Solo se mostrarán aliados de raza ${deckRace} o sin raza`}
           </p>
           <p className="text-[#F4C430] text-[10px] sm:text-xs italic">
