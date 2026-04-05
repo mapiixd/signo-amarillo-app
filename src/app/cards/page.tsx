@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react'
 import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
 import { Card } from '@/components/Card'
 import Footer from '@/components/Footer'
@@ -9,6 +9,133 @@ interface Expansion {
   id: string
   name: string
   display_order: number
+}
+
+function parseSavedStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((x): x is string => typeof x === 'string' && x.length > 0)
+  }
+  if (typeof value === 'string' && value) {
+    return [value]
+  }
+  return []
+}
+
+function FilterCheckboxCombobox({
+  label,
+  selected,
+  onChange,
+  options,
+  placeholder
+}: {
+  label: string
+  selected: string[]
+  onChange: (next: string[]) => void
+  options: { value: string; label: string }[]
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const labelId = useId()
+
+  const labelByValue = useMemo(
+    () => new Map(options.map((o) => [o.value, o.label])),
+    [options]
+  )
+
+  const triggerSummary = useMemo(() => {
+    if (selected.length === 0) return placeholder
+    const names = selected.map((v) => labelByValue.get(v) ?? v)
+    if (names.length === 1) return names[0]
+    if (names.length === 2) return `${names[0]}, ${names[1]}`
+    return `${names[0]}, ${names[1]} y ${names.length - 2} más`
+  }, [selected, labelByValue, placeholder])
+
+  const toggle = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value))
+    } else {
+      onChange([...selected, value])
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onDocDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <span id={labelId} className="block text-sm font-semibold text-[#F4C430]">
+          {label}
+        </span>
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onChange([])
+            }}
+            className="text-xs text-[#4ECDC4] hover:text-[#F4C430] transition-colors shrink-0"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={labelId}
+        onClick={() => setOpen((o) => !o)}
+        title={triggerSummary}
+        className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer text-left flex items-center justify-between gap-2 min-h-[2.75rem]"
+      >
+        <span className={`truncate ${selected.length === 0 ? 'text-[#707070]' : ''}`}>{triggerSummary}</span>
+        <span className={`shrink-0 text-[#4ECDC4] transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden>
+          ▼
+        </span>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 right-0 top-full z-50 mt-1 border-2 border-[#2D9B96] rounded-lg bg-[#121825] shadow-xl py-2 max-h-60 overflow-y-auto"
+          role="listbox"
+          aria-multiselectable="true"
+        >
+          {options.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2.5 cursor-pointer text-[#E8E8E8] text-sm hover:bg-[#1A2332] px-3 py-2 transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(opt.value)}
+                onChange={() => toggle(opt.value)}
+                className="h-4 w-4 rounded border-2 border-[#2D9B96] bg-[#0A0E1A] text-[#F4C430] focus:ring-2 focus:ring-[#F4C430] focus:ring-offset-0 cursor-pointer accent-[#F4C430] shrink-0"
+              />
+              <span className="break-words">{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function CardsPage() {
@@ -22,12 +149,12 @@ export default function CardsPage() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
-  const [expansionFilter, setExpansionFilter] = useState('')
-  const [costFilter, setCostFilter] = useState('')
-  const [attackFilter, setAttackFilter] = useState('')
-  const [raceFilter, setRaceFilter] = useState('')
-  const [rarityFilter, setRarityFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState<string[]>([])
+  const [expansionFilter, setExpansionFilter] = useState<string[]>([])
+  const [costFilter, setCostFilter] = useState<string[]>([])
+  const [attackFilter, setAttackFilter] = useState<string[]>([])
+  const [raceFilter, setRaceFilter] = useState<string[]>([])
+  const [rarityFilter, setRarityFilter] = useState<string[]>([])
   const [abilityText, setAbilityText] = useState('')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [page, setPage] = useState(1)
@@ -58,12 +185,12 @@ export default function CardsPage() {
         const state = JSON.parse(savedState)
         // Restaurar todos los estados
         setSearch(state.search || '')
-        setTypeFilter(state.typeFilter || '')
-        setExpansionFilter(state.expansionFilter || '')
-        setCostFilter(state.costFilter || '')
-        setAttackFilter(state.attackFilter || '')
-        setRaceFilter(state.raceFilter || '')
-        setRarityFilter(state.rarityFilter || '')
+        setTypeFilter(parseSavedStringArray(state.typeFilter))
+        setExpansionFilter(parseSavedStringArray(state.expansionFilter))
+        setCostFilter(parseSavedStringArray(state.costFilter))
+        setAttackFilter(parseSavedStringArray(state.attackFilter))
+        setRaceFilter(parseSavedStringArray(state.raceFilter))
+        setRarityFilter(parseSavedStringArray(state.rarityFilter))
         setAbilityText(state.abilityText || '')
         setShowAdvancedFilters(state.showAdvancedFilters || false)
         setPage(state.page || 1)
@@ -80,9 +207,9 @@ export default function CardsPage() {
 
   // Limpiar filtros avanzados cuando cambia el tipo
   useEffect(() => {
-    setCostFilter('')
-    setAttackFilter('')
-    setRaceFilter('')
+    setCostFilter([])
+    setAttackFilter([])
+    setRaceFilter([])
     setAbilityText('')
   }, [typeFilter])
 
@@ -192,6 +319,26 @@ export default function CardsPage() {
     }
   }
 
+  const costOptions = [
+    { value: '0', label: '0' },
+    { value: '1', label: '1' },
+    { value: '2', label: '2' },
+    { value: '3', label: '3' },
+    { value: '4', label: '4' },
+    { value: '5', label: '5' },
+    { value: '6+', label: '6 o más' }
+  ]
+
+  const attackOptions = [
+    { value: '1', label: '1' },
+    { value: '2', label: '2' },
+    { value: '3', label: '3' },
+    { value: '4', label: '4' },
+    { value: '5', label: '5' },
+    { value: '6', label: '6' },
+    { value: '7+', label: '7 o más' }
+  ]
+
   const fetchAllTypes = async () => {
     try {
       // Obtener todas las cartas sin filtros para extraer los tipos únicos
@@ -213,12 +360,12 @@ export default function CardsPage() {
     try {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
-      if (typeFilter) params.append('type', typeFilter)
-      if (expansionFilter) params.append('expansion', expansionFilter)
-      if (costFilter) params.append('cost', costFilter)
-      if (attackFilter) params.append('attack', attackFilter)
-      if (raceFilter) params.append('race', raceFilter)
-      if (rarityFilter) params.append('rarity', rarityFilter)
+      typeFilter.forEach((t) => params.append('type', t))
+      expansionFilter.forEach((e) => params.append('expansion', e))
+      costFilter.forEach((c) => params.append('cost', c))
+      attackFilter.forEach((a) => params.append('attack', a))
+      raceFilter.forEach((r) => params.append('race', r))
+      rarityFilter.forEach((r) => params.append('rarity', r))
       if (abilityText) params.append('ability', abilityText)
 
       const response = await fetch(`/api/cards?${params.toString()}`)
@@ -276,37 +423,27 @@ export default function CardsPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                  Tipo
-                </label>
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
-                >
-                  <option value="">Todos los tipos</option>
-                  {allUniqueTypes.map(type => (
-                    <option key={type} value={type}>{formatTypeName(type)}</option>
-                  ))}
-                </select>
-              </div>
+              <FilterCheckboxCombobox
+                label="Tipo"
+                selected={typeFilter}
+                onChange={setTypeFilter}
+                placeholder="Todos los tipos"
+                options={allUniqueTypes.map((type) => ({
+                  value: type,
+                  label: formatTypeName(type)
+                }))}
+              />
 
-              <div>
-                <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                  Expansión
-                </label>
-                <select
-                  value={expansionFilter}
-                  onChange={(e) => setExpansionFilter(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
-                >
-                  <option value="">Todas las expansiones</option>
-                  {expansions.map(expansion => (
-                    <option key={expansion.id} value={expansion.name}>{expansion.name}</option>
-                  ))}
-                </select>
-              </div>
+              <FilterCheckboxCombobox
+                label="Expansión"
+                selected={expansionFilter}
+                onChange={setExpansionFilter}
+                placeholder="Todas las expansiones"
+                options={expansions.map((expansion) => ({
+                  value: expansion.name,
+                  label: expansion.name
+                }))}
+              />
             </div>
 
             {/* Botón para mostrar filtros avanzados */}
@@ -323,41 +460,24 @@ export default function CardsPage() {
             {showAdvancedFilters && (
               <div className="mt-4 pt-4 border-t border-[#2D9B96]">
                 <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                      Coste
-                    </label>
-                    <select
-                      value={costFilter}
-                      onChange={(e) => setCostFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
-                    >
-                      <option value="">Cualquier coste</option>
-                      <option value="0">0</option>
-                      <option value="1">1</option>
-                      <option value="2">2</option>
-                      <option value="3">3</option>
-                      <option value="4">4</option>
-                      <option value="5">5</option>
-                      <option value="6+">6 o más</option>
-                    </select>
-                  </div>
+                  <FilterCheckboxCombobox
+                    label="Coste"
+                    selected={costFilter}
+                    onChange={setCostFilter}
+                    placeholder="Cualquier coste"
+                    options={costOptions}
+                  />
 
-                  <div>
-                    <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                      Rareza
-                    </label>
-                    <select
-                      value={rarityFilter}
-                      onChange={(e) => setRarityFilter(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
-                    >
-                      <option value="">Todas las rarezas</option>
-                      {Object.entries(RARITY_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <FilterCheckboxCombobox
+                    label="Rareza"
+                    selected={rarityFilter}
+                    onChange={setRarityFilter}
+                    placeholder="Todas las rarezas"
+                    options={Object.entries(RARITY_TYPE_LABELS).map(([value, label]) => ({
+                      value,
+                      label
+                    }))}
+                  />
 
                   <div>
                     <label className="block text-sm font-semibold text-[#F4C430] mb-2">
@@ -374,43 +494,23 @@ export default function CardsPage() {
                 </div>
 
                 {/* Filtros específicos para Aliados */}
-                {typeFilter === 'ALIADO' && (
+                {typeFilter.includes('ALIADO') && (
                   <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                        Fuerza
-                      </label>
-                      <select
-                        value={attackFilter}
-                        onChange={(e) => setAttackFilter(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
-                      >
-                        <option value="">Cualquier fuerza</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                        <option value="7+">7 o más</option>
-                      </select>
-                    </div>
+                    <FilterCheckboxCombobox
+                      label="Fuerza"
+                      selected={attackFilter}
+                      onChange={setAttackFilter}
+                      placeholder="Cualquier fuerza"
+                      options={attackOptions}
+                    />
 
-                    <div>
-                      <label className="block text-sm font-semibold text-[#F4C430] mb-2">
-                        Raza
-                      </label>
-                      <select
-                        value={raceFilter}
-                        onChange={(e) => setRaceFilter(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#1A2332] border-2 border-[#2D9B96] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:border-[#F4C430] text-[#E8E8E8] shadow-sm transition-all cursor-pointer"
-                      >
-                        <option value="">Todas las razas</option>
-                        {races.map(race => (
-                          <option key={race} value={race}>{race}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <FilterCheckboxCombobox
+                      label="Raza"
+                      selected={raceFilter}
+                      onChange={setRaceFilter}
+                      placeholder="Todas las razas"
+                      options={races.map((race) => ({ value: race, label: race }))}
+                    />
                   </div>
                 )}
               </div>

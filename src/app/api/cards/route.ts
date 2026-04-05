@@ -12,12 +12,12 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseClient()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
-    const type = searchParams.get('type')
-    const expansion = searchParams.get('expansion')
-    const cost = searchParams.get('cost')
-    const attack = searchParams.get('attack')
-    const race = searchParams.get('race')
-    const rarity = searchParams.get('rarity')
+    const types = searchParams.getAll('type').filter(Boolean)
+    const expansionsFilter = searchParams.getAll('expansion').filter(Boolean)
+    const costs = searchParams.getAll('cost').filter(Boolean)
+    const attacks = searchParams.getAll('attack').filter(Boolean)
+    const races = searchParams.getAll('race').filter(Boolean)
+    const rarities = searchParams.getAll('rarity').filter(Boolean)
     const ability = searchParams.get('ability')
     const rotation = searchParams.get('rotation') // 'true' para filtrar por rotación
 
@@ -51,42 +51,56 @@ export async function GET(request: NextRequest) {
       // No aplicamos el filtro de búsqueda aquí porque necesitamos filtrar sin tildes después
       // Si hay búsqueda, obtendremos todas las cartas y filtraremos después
 
-      if (type) {
-        query = query.eq('type', type)
+      if (types.length === 1) {
+        query = query.eq('type', types[0])
+      } else if (types.length > 1) {
+        query = query.in('type', types)
       }
 
-      if (expansion) {
-        query = query.eq('expansion', expansion)
+      if (expansionsFilter.length === 1) {
+        query = query.eq('expansion', expansionsFilter[0])
+      } else if (expansionsFilter.length > 1) {
+        query = query.in('expansion', expansionsFilter)
       }
 
-      if (rarity) {
-        query = query.eq('rarity', rarity)
+      if (rarities.length === 1) {
+        query = query.eq('rarity', rarities[0])
+      } else if (rarities.length > 1) {
+        query = query.in('rarity', rarities)
       }
 
-      // Filtro de coste
-      if (cost) {
+      // Filtro de coste (uno o varios valores = OR)
+      if (costs.length === 1) {
+        const cost = costs[0]
         if (cost === '6+') {
           query = query.gte('cost', 6)
         } else {
-          query = query.eq('cost', parseInt(cost))
+          query = query.eq('cost', parseInt(cost, 10))
         }
+      } else if (costs.length > 1) {
+        const orParts = costs.map((c) =>
+          c === '6+' ? 'cost.gte.6' : `cost.eq.${parseInt(c, 10)}`
+        )
+        query = query.or(orParts.join(','))
       }
 
-      // Filtro de ataque/fuerza
-      if (attack) {
+      // Filtro de ataque/fuerza (uno o varios = OR)
+      if (attacks.length === 1) {
+        const attack = attacks[0]
         if (attack === '7+') {
           query = query.gte('attack', 7)
         } else {
-          query = query.eq('attack', parseInt(attack))
+          query = query.eq('attack', parseInt(attack, 10))
         }
+      } else if (attacks.length > 1) {
+        const orParts = attacks.map((a) =>
+          a === '7+' ? 'attack.gte.7' : `attack.eq.${parseInt(a, 10)}`
+        )
+        query = query.or(orParts.join(','))
       }
 
-      // Filtro de raza - buscar si la raza está contenida en el campo (soporta multi-raza)
-      // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
-      // También incluir aliados sin raza cuando se busca una raza específica
-      if (race) {
-        // No aplicar el filtro aquí en la query de Supabase porque necesitamos
-        // lógica más compleja que incluya aliados sin raza
+      // Filtro de raza: se aplica tras agrupar (lógica multi-raza / Sin Raza)
+      if (races.length > 0) {
         // Se aplicará después de obtener las cartas
       }
 
@@ -355,30 +369,24 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Aplicar filtro de raza - buscar si la raza está contenida en el campo (soporta multi-raza)
-    // Ej: "Bestia, Dragón, Sombra" contiene "Sombra"
-    if (race) {
-      filteredCards = filteredCards.filter(card => {
-        // Si no es aliado, no aplicar filtro de raza
-        if (card.type !== 'ALIADO') {
-          return true
-        }
-        
+    // Aplicar filtro de raza (una o varias = OR entre razas)
+    if (races.length > 0) {
+      const cardMatchesRace = (card: any, race: string): boolean => {
         const cardRace = (card.race || '').trim()
-        
-        // Si se busca específicamente "Sin Raza", mostrar solo aliados sin raza
         if (race === 'Sin Raza') {
           return cardRace === '' || cardRace === 'Sin Raza'
         }
-        
-        // Para otras razas, excluir aliados sin raza o con raza vacía
         if (cardRace === '' || cardRace === 'Sin Raza') {
           return false
         }
-        
-        // Incluir aliados que tengan la raza buscada contenida en su campo de raza
-        // Esto soporta multi-raza como "Bestia, Dragón, Sombra"
         return cardRace.includes(race)
+      }
+
+      filteredCards = filteredCards.filter((card) => {
+        if (card.type !== 'ALIADO') {
+          return true
+        }
+        return races.some((race) => cardMatchesRace(card, race))
       })
     }
 
