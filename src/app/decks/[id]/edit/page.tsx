@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Swal from 'sweetalert2'
 import { Card as CardType, CARD_TYPE_LABELS, RARITY_TYPE_LABELS, DeckWithCards } from '@/types'
 import { getCardImageUrl } from '@/lib/cdn'
@@ -19,6 +19,13 @@ interface Expansion {
   id: string
   name: string
   display_order: number
+}
+
+interface BanlistApiEntry {
+  card_name: string
+  format: FormatType
+  status: BanStatus
+  max_copies?: number | null
 }
 
 export default function EditDeckPage({ params }: { params: Promise<{ id: string }> }) {
@@ -311,8 +318,8 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
           return
         }
         
-        const data = await response.json()
-        const entries: any[] = data.entries || []
+        const data: { entries?: BanlistApiEntry[] } = await response.json()
+        const entries = data.entries || []
         
         const formatsToApply: FormatType[] = deckFormat === 'Triadas'
           ? ['Triadas', 'Imperio Racial']
@@ -326,10 +333,10 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
           ? new Set(cards.filter(c => c.rarity === 'ULTRA_REAL' && !isTriadasExURSoloPromo(c.name)).map(c => c.name))
           : new Set<string>()
 
-        entries.forEach((entry: any) => {
-          if (!formatsToApply.includes(entry.format as FormatType)) return
+        entries.forEach((entry) => {
+          if (!formatsToApply.includes(entry.format)) return
           const normalizedName = entry.card_name.trim().toLowerCase()
-          const status = entry.status as BanStatus
+          const status = entry.status
           const maxCopies = entry.max_copies ?? 3
           const existing = banlistMap.get(normalizedName)
           if (!existing) {
@@ -384,42 +391,45 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
   const fetchDeck = async (id: string) => {
     try {
-      const response = await fetch('/api/decks')
+      const response = await fetch(`/api/decks/${encodeURIComponent(id)}`, {
+        credentials: 'include'
+      })
+
       if (response.ok) {
-        const decks = await response.json()
-        const foundDeck = decks.find((d: DeckWithCards) => d.id === id)
-        if (foundDeck) {
-          setName(foundDeck.name)
-          setDescription(foundDeck.description || '')
-          setIsPublic(foundDeck.is_public)
-          setDeckRace(foundDeck.race || '')
-          setDeckFormat(foundDeck.format || 'Imperio Racial')
-          
-          // Cargar cartas del mazo principal
-          const mainCards: SelectedCard[] = foundDeck.cards.map((entry: any) => ({
-            card: entry.card,
-            quantity: entry.quantity
-          }))
-          setSelectedCards(mainCards)
-          
-          // Cargar cartas del sideboard
-          const sideCards: SelectedCard[] = foundDeck.sideboard.map((entry: any) => ({
-            card: entry.card,
-            quantity: entry.quantity
-          }))
-          setSideboard(sideCards)
-        } else {
-          await Swal.fire({
-            icon: 'error',
-            title: 'Baraja no encontrada',
-            text: 'No se pudo encontrar la baraja solicitada',
-            confirmButtonColor: '#2D9B96',
-            background: '#121825',
-            color: '#F4C430'
-          })
-          router.push('/decks')
-        }
+        const foundDeck: DeckWithCards = await response.json()
+        setName(foundDeck.name)
+        setDescription(foundDeck.description || '')
+        setIsPublic(foundDeck.is_public)
+        setDeckRace(foundDeck.race || '')
+        setDeckFormat(foundDeck.format || 'Imperio Racial')
+        
+        // Cargar cartas del mazo principal
+        const mainCards: SelectedCard[] = foundDeck.cards.map((entry) => ({
+          card: entry.card,
+          quantity: entry.quantity
+        }))
+        setSelectedCards(mainCards)
+        
+        // Cargar cartas del sideboard
+        const sideCards: SelectedCard[] = foundDeck.sideboard.map((entry) => ({
+          card: entry.card,
+          quantity: entry.quantity
+        }))
+        setSideboard(sideCards)
+        return
       }
+
+      await Swal.fire({
+        icon: 'error',
+        title: response.status === 403 ? 'Acceso denegado' : 'Baraja no encontrada',
+        text: response.status === 403
+          ? 'No tienes permiso para editar esta baraja'
+          : 'No se pudo encontrar la baraja solicitada',
+        confirmButtonColor: '#2D9B96',
+        background: '#121825',
+        color: '#F4C430'
+      })
+      router.push('/decks')
     } catch (error) {
       console.error('Error fetching deck:', error)
       await Swal.fire({
@@ -1454,4 +1464,3 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
     </div>
   )
 }
-

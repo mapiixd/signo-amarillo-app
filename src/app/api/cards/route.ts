@@ -2,9 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { filterCardsInRotation } from '@/lib/rotation'
 import { normalizeString } from '@/lib/utils'
+import type { Card } from '@/types'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
 export const dynamic = 'force-dynamic'
+
+const CARD_SELECT = [
+  'id',
+  'name',
+  'type',
+  'cost',
+  'attack',
+  'defense',
+  'description',
+  'image_url',
+  'image_file',
+  'rarity',
+  'race',
+  'expansion',
+  'game',
+  'is_active',
+  'created_at',
+  'updated_at'
+].join(',')
 
 // GET /api/cards - Obtener todas las cartas
 export async function GET(request: NextRequest) {
@@ -19,6 +39,11 @@ export async function GET(request: NextRequest) {
     const races = searchParams.getAll('race').filter(Boolean)
     const rarities = searchParams.getAll('rarity').filter(Boolean)
     const ability = searchParams.get('ability')
+    const pageParam = Number(searchParams.get('page') || '0')
+    const pageSizeParam = Number(searchParams.get('pageSize') || '0')
+    const isPaginated = pageParam > 0 && pageSizeParam > 0
+    const page = isPaginated ? Math.max(1, pageParam) : 1
+    const pageSize = isPaginated ? Math.min(Math.max(1, pageSizeParam), 100) : 0
     const rotation = searchParams.get('rotation') // 'true' para filtrar por rotación
 
     // Obtener el orden de las expansiones
@@ -33,7 +58,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Obtener TODAS las cartas (sin límite de 1000)
-    let allCards: any[] = []
+    let allCards: Card[] = []
     let from = 0
     const batchSize = 1000
     let hasMore = true
@@ -41,7 +66,7 @@ export async function GET(request: NextRequest) {
     while (hasMore) {
       let query = supabase
         .from('cards')
-        .select('*')
+        .select(CARD_SELECT)
         .eq('is_active', true)
         .range(from, from + batchSize - 1)
 
@@ -116,7 +141,7 @@ export async function GET(request: NextRequest) {
       }
 
       if (data && data.length > 0) {
-        allCards = allCards.concat(data)
+        allCards = allCards.concat(data as unknown as Card[])
         from += batchSize
       }
 
@@ -145,7 +170,7 @@ export async function GET(request: NextRequest) {
     const specialRarities = ['PROMO', 'SECRETA', 'LEGENDARIA']
 
     // Función para extraer edid de image_url o image_file
-    const extractEdid = (card: any): number => {
+    const extractEdid = (card: Card): number => {
       // Prioridad 1: Intentar extraer de image_url
       if (card.image_url) {
         // Extraer el nombre del archivo de la URL (puede ser CDN o ruta local)
@@ -223,7 +248,7 @@ export async function GET(request: NextRequest) {
     // Filtrar duplicados
     // En el editor de mazos (rotation=true): mostrar TODAS las versiones (agrupar por ID único)
     // En el visor de cartas: agrupar por nombre+expansión para mostrar todas las versiones
-    const cardsByKey = new Map<string, any>()
+    const cardsByKey = new Map<string, Card>()
     
     // Determinar la clave de agrupación según el contexto
     const groupByExpansion = rotation !== 'true' // En el visor de cartas, agrupar por nombre+expansión
@@ -279,7 +304,7 @@ export async function GET(request: NextRequest) {
     // Filtrar duplicados entre expansiones específicas
     // Si una carta tiene versiones en ambas expansiones de un par, mantener solo una
     if (rotation === 'true') {
-      const cardsByName = new Map<string, any[]>()
+      const cardsByName = new Map<string, Card[]>()
       
       // Agrupar cartas por nombre
       filteredCards.forEach(card => {
@@ -297,8 +322,8 @@ export async function GET(request: NextRequest) {
       ]
       
       // Para cada grupo de cartas con el mismo nombre
-      const finalCards: any[] = []
-      cardsByName.forEach((cards, normalizedName) => {
+      const finalCards: Card[] = []
+      cardsByName.forEach((cards) => {
         let cardsToKeep = [...cards]
         
         // Aplicar filtros para cada par de expansiones
@@ -371,7 +396,7 @@ export async function GET(request: NextRequest) {
 
     // Aplicar filtro de raza (una o varias = OR entre razas)
     if (races.length > 0) {
-      const cardMatchesRace = (card: any, race: string): boolean => {
+      const cardMatchesRace = (card: Card, race: string): boolean => {
         const cardRace = (card.race || '').trim()
         if (race === 'Sin Raza') {
           return cardRace === '' || cardRace === 'Sin Raza'
@@ -396,6 +421,20 @@ export async function GET(request: NextRequest) {
       // Obtener el formato del query string si está disponible, por defecto 'Imperio Racial'
       const format = searchParams.get('format') || 'Imperio Racial'
       filteredCards = await filterCardsInRotation(filteredCards || [], format)
+    }
+
+    if (isPaginated) {
+      const total = filteredCards.length
+      const start = (page - 1) * pageSize
+      const paginatedCards = filteredCards.slice(start, start + pageSize)
+
+      return NextResponse.json({
+        cards: paginatedCards,
+        total,
+        page,
+        pageSize,
+        hasMore: start + pageSize < total
+      })
     }
 
     return NextResponse.json(filteredCards)

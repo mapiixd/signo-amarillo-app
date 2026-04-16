@@ -11,6 +11,33 @@ interface Expansion {
   display_order: number
 }
 
+interface CardsApiResponse {
+  cards: CardType[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+interface CardOptionsResponse {
+  types: string[]
+  races: string[]
+}
+
+interface CardsPageSavedState {
+  search?: string
+  typeFilter?: unknown
+  expansionFilter?: unknown
+  costFilter?: unknown
+  attackFilter?: unknown
+  raceFilter?: unknown
+  rarityFilter?: unknown
+  abilityText?: string
+  showAdvancedFilters?: boolean
+  page?: number
+  scrollY?: number
+}
+
 function parseSavedStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.filter((x): x is string => typeof x === 'string' && x.length > 0)
@@ -142,10 +169,12 @@ export default function CardsPage() {
   useEffect(() => {
     document.title = 'Grimorio de Cartas | El Signo Amarillo'
   }, [])
-  const [allCards, setAllCards] = useState<CardType[]>([])
-  const [displayedCards, setDisplayedCards] = useState<CardType[]>([])
+  const [cards, setCards] = useState<CardType[]>([])
+  const [totalCards, setTotalCards] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [expansions, setExpansions] = useState<Expansion[]>([])
   const [allUniqueTypes, setAllUniqueTypes] = useState<string[]>([])
+  const [availableRaces, setAvailableRaces] = useState<string[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
@@ -159,9 +188,17 @@ export default function CardsPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [stateRestored, setStateRestored] = useState(false)
   
   const CARDS_PER_PAGE = 50
   const observerTarget = useRef<HTMLDivElement>(null)
+  const cardsAbortRef = useRef<AbortController | null>(null)
+  const latestRequestRef = useRef(0)
+  const didInitTypeFilterRef = useRef(false)
+  const restoredPageRef = useRef(1)
+  const restoredScrollYRef = useRef(0)
+  const hasRestoredScrollRef = useRef(false)
+  const didRunCardsFetchEffectRef = useRef(false)
 
   // Lista de razas disponibles
   const races = [
@@ -182,7 +219,7 @@ export default function CardsPage() {
     const savedState = sessionStorage.getItem('cardsPageState')
     if (savedState) {
       try {
-        const state = JSON.parse(savedState)
+        const state = JSON.parse(savedState) as CardsPageSavedState
         // Restaurar todos los estados
         setSearch(state.search || '')
         setTypeFilter(parseSavedStringArray(state.typeFilter))
@@ -193,7 +230,9 @@ export default function CardsPage() {
         setRarityFilter(parseSavedStringArray(state.rarityFilter))
         setAbilityText(state.abilityText || '')
         setShowAdvancedFilters(state.showAdvancedFilters || false)
-        setPage(state.page || 1)
+        restoredPageRef.current = 1
+        restoredScrollYRef.current = (state.page || 1) <= 1 ? Math.max(0, state.scrollY || 0) : 0
+        setPage(1)
         // No eliminar el estado aquí, se eliminará después de restaurar
         // para permitir múltiples navegaciones
       } catch (error) {
@@ -202,19 +241,28 @@ export default function CardsPage() {
       }
     }
     fetchExpansions()
-    fetchAllTypes()
+    fetchCardOptions()
+    setStateRestored(true)
   }, [])
 
   // Limpiar filtros avanzados cuando cambia el tipo
   useEffect(() => {
+    if (!stateRestored) return
+    if (!didInitTypeFilterRef.current) {
+      didInitTypeFilterRef.current = true
+      return
+    }
+
     setCostFilter([])
     setAttackFilter([])
     setRaceFilter([])
     setAbilityText('')
-  }, [typeFilter])
+  }, [typeFilter, stateRestored])
 
   // Función para guardar el estado actual
   const saveState = useCallback(() => {
+    if (!stateRestored) return
+
     const state = {
       search,
       typeFilter,
@@ -225,10 +273,11 @@ export default function CardsPage() {
       rarityFilter,
       abilityText,
       showAdvancedFilters,
-      page
+      page,
+      scrollY: typeof window !== 'undefined' ? window.scrollY : 0
     }
     sessionStorage.setItem('cardsPageState', JSON.stringify(state))
-  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, rarityFilter, abilityText, showAdvancedFilters, page])
+  }, [stateRestored, search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, rarityFilter, abilityText, showAdvancedFilters, page])
 
   // Guardar estado cuando cambian los filtros
   useEffect(() => {
@@ -264,32 +313,35 @@ export default function CardsPage() {
   }, [saveState])
 
   useEffect(() => {
-    // Limpiar el estado guardado después de la primera carga con filtros restaurados
-    const savedState = sessionStorage.getItem('cardsPageState')
-    if (savedState) {
-      sessionStorage.removeItem('cardsPageState')
-    }
-    fetchCards()
-  }, [search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, rarityFilter, abilityText])
+    if (!stateRestored) return
 
-  useEffect(() => {
-    // Actualizar las cartas mostradas cuando cambia la página
-    const startIndex = 0
-    const endIndex = page * CARDS_PER_PAGE
-    setDisplayedCards(allCards.slice(startIndex, endIndex))
-  }, [allCards, page])
+    if (didRunCardsFetchEffectRef.current) {
+      restoredPageRef.current = 1
+      restoredScrollYRef.current = 0
+      hasRestoredScrollRef.current = true
+    } else {
+      didRunCardsFetchEffectRef.current = true
+    }
+
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      fetchCards(restoredPageRef.current, false, controller.signal)
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [stateRestored, search, typeFilter, expansionFilter, costFilter, attackFilter, raceFilter, rarityFilter, abilityText])
+
 
   // Intersection Observer para infinite scroll
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
     const [target] = entries
-    if (target.isIntersecting && !loadingMore && displayedCards.length < allCards.length) {
-      setLoadingMore(true)
-      setTimeout(() => {
-        setPage(prev => prev + 1)
-        setLoadingMore(false)
-      }, 300)
+    if (target.isIntersecting && !loading && !loadingMore && hasMore) {
+      fetchCards(page + 1, true)
     }
-  }, [loadingMore, displayedCards.length, allCards.length])
+  }, [loading, loadingMore, hasMore, page])
 
   useEffect(() => {
     const element = observerTarget.current
@@ -339,26 +391,40 @@ export default function CardsPage() {
     { value: '7+', label: '7 o más' }
   ]
 
-  const fetchAllTypes = async () => {
+  const fetchCardOptions = async () => {
     try {
-      // Obtener todas las cartas sin filtros para extraer los tipos únicos
-      const response = await fetch('/api/cards')
+      const response = await fetch('/api/cards/options')
       if (response.ok) {
-        const data = await response.json() as CardType[]
-        const uniqueTypes = Array.from(new Set(data.map((card: CardType) => card.type))) as string[]
-        setAllUniqueTypes(uniqueTypes)
+        const data = await response.json() as CardOptionsResponse
+        setAllUniqueTypes(data.types || [])
+        setAvailableRaces(data.races || [])
       }
     } catch (error) {
-      console.error('Error fetching all types:', error)
+      console.error('Error fetching card options:', error)
     }
   }
 
-  const fetchCards = async () => {
-    setLoading(true)
-    setPage(1) // Reiniciar a la primera página cuando cambian los filtros
+  async function fetchCards(pageToLoad = 1, append = false, signal?: AbortSignal) {
+    const requestId = latestRequestRef.current + 1
+    latestRequestRef.current = requestId
+
+    if (!append) {
+      cardsAbortRef.current?.abort()
+    }
+
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+      setCards([])
+      setTotalCards(0)
+      setHasMore(false)
+    }
     
     try {
       const params = new URLSearchParams()
+      params.set('page', pageToLoad.toString())
+      params.set('pageSize', CARDS_PER_PAGE.toString())
       if (search) params.append('search', search)
       typeFilter.forEach((t) => params.append('type', t))
       expansionFilter.forEach((e) => params.append('expansion', e))
@@ -368,20 +434,43 @@ export default function CardsPage() {
       rarityFilter.forEach((r) => params.append('rarity', r))
       if (abilityText) params.append('ability', abilityText)
 
-      const response = await fetch(`/api/cards?${params.toString()}`)
+      const controller = signal ? null : new AbortController()
+      const activeSignal = signal || controller?.signal
+      if (!append && controller) {
+        cardsAbortRef.current = controller
+      }
+
+      const response = await fetch(`/api/cards?${params.toString()}`, {
+        signal: activeSignal
+      })
       if (response.ok) {
-        const data = await response.json()
-        setAllCards(data)
+        const data = await response.json() as CardsApiResponse
+        if (requestId !== latestRequestRef.current) return
+
+        setCards((current) => append ? [...current, ...data.cards] : data.cards)
+        setTotalCards(data.total)
+        setPage(data.page)
+        setHasMore(data.hasMore)
+
+        if (!append && !hasRestoredScrollRef.current && restoredScrollYRef.current > 0) {
+          hasRestoredScrollRef.current = true
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: restoredScrollYRef.current })
+          })
+        }
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
       console.error('Error fetching cards:', error)
     } finally {
+      if (requestId !== latestRequestRef.current) return
       setLoading(false)
+      setLoadingMore(false)
       setInitialLoading(false)
     }
   }
-
-  const hasMore = displayedCards.length < allCards.length
   
   // Función para formatear el nombre del tipo
   const formatTypeName = (type: string): string => {
@@ -509,7 +598,7 @@ export default function CardsPage() {
                       selected={raceFilter}
                       onChange={setRaceFilter}
                       placeholder="Todas las razas"
-                      options={races.map((race) => ({ value: race, label: race }))}
+                      options={(availableRaces.length > 0 ? availableRaces : races).map((race) => ({ value: race, label: race }))}
                     />
                   </div>
                 )}
@@ -520,8 +609,8 @@ export default function CardsPage() {
           {/* Estadísticas */}
           <div className="bg-[#121825] border border-[#2D9B96] rounded-lg shadow-md p-4 mb-6">
             <p className="text-[#E8E8E8] font-medium">
-              Mostrando <span className="text-[#F4C430] font-bold">{displayedCards.length}</span> de{' '}
-              <span className="text-[#F4C430] font-bold">{allCards.length}</span> carta{allCards.length !== 1 ? 's' : ''}
+              Mostrando <span className="text-[#F4C430] font-bold">{cards.length}</span> de{' '}
+              <span className="text-[#F4C430] font-bold">{totalCards}</span> carta{totalCards !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -532,10 +621,10 @@ export default function CardsPage() {
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#F4C430] mb-4 signo-glow"></div>
             <p className="text-[#4ECDC4] font-medium text-lg">Aplicando filtros...</p>
           </div>
-        ) : displayedCards.length > 0 ? (
+        ) : cards.length > 0 ? (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6 items-stretch">
-              {displayedCards.map((card) => (
+              {cards.map((card) => (
                 <Card key={card.id} card={card} />
               ))}
             </div>
@@ -552,7 +641,7 @@ export default function CardsPage() {
                   )}
                 </div>
               )}
-              {!hasMore && allCards.length > CARDS_PER_PAGE && (
+              {!hasMore && totalCards > CARDS_PER_PAGE && (
                 <div className="text-center">
                   <p className="text-[#2D9B96] font-medium">✓ Todas las cartas cargadas</p>
                 </div>

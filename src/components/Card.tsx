@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { SupabaseCard, CardWithQuantity, CARD_TYPE_LABELS, RARITY_TYPE_LABELS } from '@/types'
-import { getCardImageUrl } from '@/lib/cdn'
+import { getCardThumbnailUrl } from '@/lib/cdn'
 
 interface CardProps {
   card: SupabaseCard | CardWithQuantity
@@ -36,7 +36,7 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
     }
   }
 
-  const imageUrl = card.image_url ? getCardImageUrl(card.image_url) : null
+  const imageUrl = card.image_url ? getCardThumbnailUrl(card.image_url) : null
 
   const cardContent = (
     <div className={`bg-[#121825] rounded-lg shadow-lg p-4 border border-[#2D9B96] transition-all h-full flex flex-col ${clickable ? 'hover:shadow-2xl hover:scale-105 cursor-pointer hover-glow' : 'hover:shadow-xl'}`}>
@@ -46,6 +46,8 @@ export function Card({ card, showQuantity = false, clickable = true }: CardProps
             src={imageUrl}
             alt={card.name}
             className="w-full h-full object-cover rounded"
+            width={200}
+            height={267}
             loading="lazy"
           />
         ) : (

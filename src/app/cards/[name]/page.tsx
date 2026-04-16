@@ -17,6 +17,10 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null)
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [decodedName])
+
+  useEffect(() => {
     if (selectedCard) {
       document.title = `${selectedCard.name} | El Signo Amarillo`;
     } else {
@@ -295,4 +299,3 @@ export default function CardDetailPage({ params }: { params: Promise<{ name: str
     </div>
   )
 }
-
