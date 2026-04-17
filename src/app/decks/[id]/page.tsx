@@ -433,136 +433,69 @@ export default function DeckViewPage() {
 
   const handleExportImage = async () => {
     if (!deck) return
-    
+
+    const source = deckViewRef.current
+    if (!source) return
+
     setExporting(true)
-    
+    let restoreExportContainerStyles = () => {}
+
     try {
       const html2canvas = (await import('html2canvas')).default
-      // Detectar Safari en iOS para usar configuración optimizada (sin servidor)
       const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      
-      if (!deckViewRef.current) {
-        setExporting(false)
-        return
+      const isAndroid = /Android/i.test(navigator.userAgent)
+      const exportWidth = isSafari || isIOS
+        ? exportOrientation === 'horizontal' ? 1440 : 800
+        : exportOrientation === 'horizontal' ? 1800 : 1000
+      const exportPadding = isSafari || isIOS ? '24px' : '32px'
+      const jpegQuality = isSafari || isIOS ? 0.8 : 0.85
+      const MAX_CANVAS_EDGE = isAndroid ? 8000 : 10000
+
+      const originalVisibility = source.style.visibility
+      const originalPosition = source.style.position
+      const originalLeft = source.style.left
+      const originalTop = source.style.top
+      const originalZIndex = source.style.zIndex
+      const originalWidth = source.style.width
+      const originalMaxWidth = source.style.maxWidth
+      const originalMinWidth = source.style.minWidth
+      const originalOpacity = source.style.opacity
+      const originalPointerEvents = source.style.pointerEvents
+      const originalBackground = source.style.background
+      const originalPadding = source.style.padding
+      const originalBoxSizing = source.style.boxSizing
+
+      restoreExportContainerStyles = () => {
+        source.style.visibility = originalVisibility
+        source.style.position = originalPosition
+        source.style.left = originalLeft
+        source.style.top = originalTop
+        source.style.zIndex = originalZIndex
+        source.style.width = originalWidth
+        source.style.maxWidth = originalMaxWidth
+        source.style.minWidth = originalMinWidth
+        source.style.opacity = originalOpacity
+        source.style.pointerEvents = originalPointerEvents
+        source.style.background = originalBackground
+        source.style.padding = originalPadding
+        source.style.boxSizing = originalBoxSizing
       }
-      
-      // Safari/iOS: exportar con dimensiones reducidas (html2canvas en cliente)
-      if (isSafari || isIOS) {
-        try {
-          const exportWidth = exportOrientation === 'horizontal' ? 1440 : 800
-          deckViewRef.current.style.position = 'absolute'
-          deckViewRef.current.style.top = '0'
-          deckViewRef.current.style.left = '-9999px'
-          deckViewRef.current.style.width = `${exportWidth}px`
-          deckViewRef.current.style.maxWidth = `${exportWidth}px`
-          deckViewRef.current.style.minWidth = `${exportWidth}px`
-          deckViewRef.current.style.visibility = 'visible'
-          deckViewRef.current.style.opacity = '1'
-          deckViewRef.current.style.background = '#0A0E1A'
-          deckViewRef.current.style.padding = '24px'
-          
-          await new Promise(resolve => setTimeout(resolve, 300))
-          
-          const canvas = await html2canvas(deckViewRef.current, {
-            backgroundColor: '#0A0E1A',
-            scale: 1.5,
-            logging: false,
-            useCORS: true,
-            allowTaint: true,
-            foreignObjectRendering: false,
-            width: exportWidth,
-            windowHeight: deckViewRef.current.scrollHeight,
-            onclone: (clonedDoc, element) => {
-              const actionButtons = element.querySelectorAll('button')
-              actionButtons.forEach((btn) => {
-                const htmlBtn = btn as HTMLElement
-                htmlBtn.style.display = 'none'
-              })
-              const footer = element.querySelector('footer')
-              if (footer) footer.style.display = 'none'
-              
-              const badges = element.querySelectorAll('.rounded-full')
-              badges.forEach((badge) => {
-                const htmlBadge = badge as HTMLElement
-                if (htmlBadge.classList.contains('w-12') && htmlBadge.classList.contains('h-12')) {
-                  htmlBadge.style.borderRadius = '50%'
-                  htmlBadge.style.width = '48px'
-                  htmlBadge.style.height = '48px'
-                  htmlBadge.style.minWidth = '48px'
-                  htmlBadge.style.minHeight = '48px'
-                  htmlBadge.style.overflow = 'hidden'
-                  htmlBadge.style.display = 'flex'
-                  htmlBadge.style.alignItems = 'center'
-                  htmlBadge.style.justifyContent = 'center'
-                  const span = htmlBadge.querySelector('span') as HTMLElement
-                  if (span) {
-                    span.style.transform = 'translateY(-10px)'
-                  }
-                }
-              })
-            }
-          })
-          
-          deckViewRef.current.style.visibility = 'hidden'
-          deckViewRef.current.style.position = 'absolute'
-          deckViewRef.current.style.left = '-9999px'
-          
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const url = URL.createObjectURL(blob)
-              const link = document.createElement('a')
-              link.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_${activeTab}.jpg`
-              link.href = url
-              link.click()
-              URL.revokeObjectURL(url)
-            }
-            setExporting(false)
-          }, 'image/jpeg', 0.80)
-          
-          return
-        } catch (safariError) {
-          console.error('Error en exportación Safari/iOS:', safariError)
-          setExporting(false)
-          alert('Error al exportar la imagen en Safari/iOS. Por favor, intenta desde un navegador de escritorio.')
-          return
-        }
-      }
-      
-      // Escritorio: html2canvas con máxima calidad
-      if (!deckViewRef.current) return
-      
-      // Guardar estilos originales del contenedor de exportación
-      const originalVisibility = deckViewRef.current.style.visibility
-      const originalPosition = deckViewRef.current.style.position
-      const originalLeft = deckViewRef.current.style.left
-      const originalTop = deckViewRef.current.style.top
-      const originalZIndex = deckViewRef.current.style.zIndex
-      const originalWidth = deckViewRef.current.style.width
-      const originalMaxWidth = deckViewRef.current.style.maxWidth
-      const originalOpacity = deckViewRef.current.style.opacity
-      const originalPointerEvents = deckViewRef.current.style.pointerEvents
-      
-      // Mover el contenedor fuera de la pantalla pero mantenerlo accesible para html2canvas
-      // Usamos posición fuera de la pantalla pero sin ocultarlo completamente para que html2canvas pueda capturarlo
-      // Ancho según orientación seleccionada
-      const exportWidth = exportOrientation === 'horizontal' ? 1800 : 1000
-      deckViewRef.current.style.position = 'absolute'
-      deckViewRef.current.style.top = '0'
-      deckViewRef.current.style.left = '-9999px'
-      deckViewRef.current.style.width = `${exportWidth}px`
-      deckViewRef.current.style.maxWidth = `${exportWidth}px`
-      deckViewRef.current.style.minWidth = `${exportWidth}px`
-      deckViewRef.current.style.visibility = 'visible' // Necesario para html2canvas
-      deckViewRef.current.style.opacity = '1' // Necesario para html2canvas
-      deckViewRef.current.style.pointerEvents = 'none' // Evitar interacciones
-      deckViewRef.current.style.background = '#0A0E1A'
-      deckViewRef.current.style.padding = '32px'
-      deckViewRef.current.style.zIndex = '-9999' // Asegurar que esté detrás de todo
-      
-      // Esperar un momento para que el contenedor se renderice completamente
-      await new Promise(resolve => setTimeout(resolve, 200))
-      
+
+      source.style.boxSizing = 'border-box'
+      source.style.position = 'fixed'
+      source.style.top = '0'
+      source.style.left = '0'
+      source.style.width = `${exportWidth}px`
+      source.style.maxWidth = `${exportWidth}px`
+      source.style.minWidth = `${exportWidth}px`
+      source.style.visibility = 'visible'
+      source.style.opacity = '1'
+      source.style.pointerEvents = 'none'
+      source.style.background = '#0A0E1A'
+      source.style.padding = exportPadding
+      source.style.zIndex = '-9999'
+
       // Función para reemplazar gradientes modernos con versiones compatibles
       const replaceModernGradients = (element: HTMLElement) => {
         const allElements = element.querySelectorAll('*')
@@ -581,19 +514,51 @@ export default function DeckViewPage() {
           }
         })
       }
-      
+
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      await new Promise(resolve => setTimeout(resolve, isSafari || isIOS ? 300 : 200))
+
+      const contentHeight = Math.max(1, source.scrollHeight)
+      const baseScale = isSafari || isIOS || isAndroid ? 1.5 : 2
+      const maxScaleByWidth = MAX_CANVAS_EDGE / exportWidth
+      const maxScaleByHeight = MAX_CANVAS_EDGE / contentHeight
+      const scale = Math.max(
+        0.25,
+        Math.round(Math.min(baseScale, maxScaleByWidth, maxScaleByHeight) * 1000) / 1000,
+      )
+
       // Capturar el elemento como canvas con manejo de errores CSS
-      const canvas = await html2canvas(deckViewRef.current, {
+      const canvas = await html2canvas(source, {
         backgroundColor: '#0A0E1A',
-        scale: 2, // Escala 2 para mejor calidad en todos los dispositivos
+        scale,
         logging: false,
         useCORS: true,
         allowTaint: true,
         foreignObjectRendering: false, // Deshabilitar para evitar problemas con CSS moderno
         width: exportWidth, // Ancho según orientación
-        height: deckViewRef.current.scrollHeight, // Altura automática basada en contenido
+        height: contentHeight, // Altura automática basada en contenido
+        windowWidth: exportWidth,
+        windowHeight: contentHeight,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
         onclone: (clonedDoc, element) => {
           try {
+            clonedDoc.documentElement.style.width = `${exportWidth}px`
+            clonedDoc.documentElement.style.minWidth = `${exportWidth}px`
+            clonedDoc.body.style.width = `${exportWidth}px`
+            clonedDoc.body.style.minWidth = `${exportWidth}px`
+            clonedDoc.body.style.margin = '0'
+            element.style.position = 'fixed'
+            element.style.top = '0'
+            element.style.left = '0'
+            element.style.width = `${exportWidth}px`
+            element.style.maxWidth = `${exportWidth}px`
+            element.style.minWidth = `${exportWidth}px`
+            element.style.overflow = 'visible'
+
             // Ocultar botones de acción durante la exportación
             const actionButtons = element.querySelectorAll('button')
             actionButtons.forEach((btn) => {
@@ -623,7 +588,7 @@ export default function DeckViewPage() {
                 try {
                   const computedStyle = clonedDoc.defaultView?.getComputedStyle(htmlEl)
                   bgImage = computedStyle?.backgroundImage || computedStyle?.background || ''
-                } catch (e) {
+                } catch {
                   // Si falla, continuar
                 }
                 
@@ -701,37 +666,33 @@ export default function DeckViewPage() {
           }
         }
       })
-      
-      // Restaurar el estilo original del contenedor
-      deckViewRef.current.style.visibility = originalVisibility || 'hidden'
-      deckViewRef.current.style.position = originalPosition || 'absolute'
-      deckViewRef.current.style.left = originalLeft || '-9999px'
-      deckViewRef.current.style.top = originalTop || '0'
-      deckViewRef.current.style.zIndex = originalZIndex || ''
-      deckViewRef.current.style.width = originalWidth || ''
-      deckViewRef.current.style.maxWidth = originalMaxWidth || ''
-      deckViewRef.current.style.opacity = originalOpacity || ''
-      deckViewRef.current.style.pointerEvents = originalPointerEvents || ''
-      
+
+      restoreExportContainerStyles()
+
       // Convertir a blob con compresión JPEG para reducir tamaño
-      canvas.toBlob((blob) => {
-        if (blob) {
-          // Crear URL temporal
-          const url = URL.createObjectURL(blob)
-          
-          // Crear link de descarga
-          const link = document.createElement('a')
-          link.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_${activeTab}.jpg`
-          link.href = url
-          link.click()
-          
-          // Limpiar
-          URL.revokeObjectURL(url)
+      const blob: Blob | null = await new Promise((resolve, reject) => {
+        try {
+          canvas.toBlob((b) => resolve(b), 'image/jpeg', jpegQuality)
+        } catch (e) {
+          reject(e)
         }
-        setExporting(false)
-      }, 'image/jpeg', 0.85) // JPEG con calidad 0.85 (85%) para reducir tamaño significativamente
+      })
+
+      if (!blob) {
+        throw new Error('El navegador no pudo generar la imagen del mazo.')
+      }
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.download = `${deck.name.replace(/[^a-z0-9]/gi, '_')}_${activeTab}.jpg`
+      link.href = url
+      link.click()
+      URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Error al exportar imagen:', error)
+      alert('No se pudo exportar la imagen del mazo. Intenta cambiar la orientación o probar nuevamente.')
+    } finally {
+      restoreExportContainerStyles()
       setExporting(false)
     }
   }
