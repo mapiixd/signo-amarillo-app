@@ -899,7 +899,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                 : `Formato: Imperio Racial | Solo se mostrarán aliados de raza ${deckRace} o sin raza`}
           </p>
           <p className="text-[#F4C430] text-[10px] sm:text-xs italic">
-            📋 Rotación activa: posterior a Espíritu Samurai
+            📋 Rotación Activa: Bestiarium - AyD: Vigilantes
           </p>
         </div>
 
