@@ -449,7 +449,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
 
   const fetchCards = async () => {
     try {
-      // Obtener solo las cartas en rotación (desde Espiritu Samurai en adelante)
+      // Obtener solo las cartas en rotación (posteriores a Espiritu Samurai)
       const response = await fetch('/api/cards?rotation=true')
       if (response.ok) {
         const data = await response.json()
@@ -899,7 +899,7 @@ export default function EditDeckPage({ params }: { params: Promise<{ id: string 
                 : `Formato: Imperio Racial | Solo se mostrarán aliados de raza ${deckRace} o sin raza`}
           </p>
           <p className="text-[#F4C430] text-[10px] sm:text-xs italic">
-            📋 Rotación activa: Espíritu Samurai - KvsM : Titanes
+            📋 Rotación activa: posterior a Espíritu Samurai
           </p>
         </div>
 

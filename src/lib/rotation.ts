@@ -1,5 +1,5 @@
 // Sistema de rotación de cartas
-// Solo las cartas desde "Espiritu Samurai" en adelante están disponibles para crear barajas
+// Solo las cartas posteriores a "Espiritu Samurai" están disponibles para crear barajas
 // Además, hay cartas reimpresas que están en rotación independientemente de su expansión original
 
 import { getSupabaseClient } from './supabase-server'
@@ -266,7 +266,7 @@ export async function getRotatedExpansions(): Promise<string[]> {
     const { data: expansions, error } = await supabase
       .from('expansions')
       .select('name')
-      .gte('display_order', startOrder)
+      .gt('display_order', startOrder)
       .order('display_order', { ascending: true })
 
     if (error) {
@@ -312,7 +312,7 @@ export async function isExpansionInRotation(expansionName: string): Promise<bool
       return false
     }
 
-    return expansion.display_order >= startOrder
+    return expansion.display_order > startOrder
   } catch (error) {
     console.error('Error in isExpansionInRotation:', error)
     return false
