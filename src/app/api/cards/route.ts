@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { filterCardsInRotation } from '@/lib/rotation'
 import { normalizeString } from '@/lib/utils'
+import { isDeckBuilderCardAvailable } from '@/lib/deck-builder-card-availability'
 import type { Card } from '@/types'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
@@ -421,6 +422,7 @@ export async function GET(request: NextRequest) {
       // Obtener el formato del query string si está disponible, por defecto 'Imperio Racial'
       const format = searchParams.get('format') || 'Imperio Racial'
       filteredCards = await filterCardsInRotation(filteredCards || [], format)
+      filteredCards = filteredCards.filter(isDeckBuilderCardAvailable)
     }
 
     if (isPaginated) {

@@ -8,6 +8,7 @@ import { getCardImageUrl } from '@/lib/cdn'
 import { getBanStatusIcon, getBanStatusLabel, type FormatType, type BanStatus } from '@/lib/banlist'
 import { getRacesForTriada, allyMatchesTriada, isTriadasExURSoloPromo, type TriadaName } from '@/lib/triadas'
 import { isVCRPermittedRarity } from '@/lib/vcr'
+import { isDeckBuilderCardAvailable } from '@/lib/deck-builder-card-availability'
 import Footer from '@/components/Footer'
 
 interface SelectedCard {
@@ -368,7 +369,7 @@ function NewDeckPageContent() {
       const response = await fetch('/api/expansions')
       if (response.ok) {
         const data = await response.json()
-        setExpansions(data)
+        setExpansions(data.filter(isDeckBuilderCardAvailable))
       }
     } catch (error) {
       console.error('Error fetching expansions:', error)
