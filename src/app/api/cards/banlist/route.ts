@@ -15,6 +15,36 @@ type DbBanlistEntry = {
 const FORMATS: FormatType[] = ['Imperio Racial', 'VCR', 'Triadas']
 const normalizeCardName = (name: string) => name.trim().toLowerCase()
 
+async function fetchAllActiveCards(): Promise<Card[]> {
+  const supabase = getSupabaseClient()
+  const batchSize = 1000
+  let from = 0
+  let allCards: Card[] = []
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('*')
+      .eq('is_active', true)
+      .range(from, from + batchSize - 1)
+
+    if (error) {
+      throw error
+    }
+
+    if (data?.length) {
+      allCards = allCards.concat(data as Card[])
+      from += batchSize
+    }
+
+    if (!data || data.length < batchSize) {
+      break
+    }
+  }
+
+  return allCards
+}
+
 // Funcion auxiliar para obtener banlists desde la base de datos
 async function getBanlistsFromDB(): Promise<Record<FormatType, BanlistEntry[]>> {
   const supabase = getSupabaseClient()
@@ -59,7 +89,6 @@ async function getBanlistsFromDB(): Promise<Record<FormatType, BanlistEntry[]>> 
 // GET /api/cards/banlist - Obtener todas las cartas de la banlist
 export async function GET() {
   try {
-    const supabase = getSupabaseClient()
     const banlists = await getBanlistsFromDB()
 
     const allCardNames = new Set<string>()
@@ -74,16 +103,7 @@ export async function GET() {
       return NextResponse.json({ cards: [] })
     }
 
-    const { data, error } = await supabase
-      .from('cards')
-      .select('*')
-      .eq('is_active', true)
-
-    if (error) {
-      throw error
-    }
-
-    const candidateCards = ((data || []) as Card[]).filter((card) =>
+    const candidateCards = (await fetchAllActiveCards()).filter((card) =>
       allCardNames.has(normalizeCardName(card.name))
     )
     const availableCards = (await filterCardsInRotation(candidateCards, 'Imperio Racial'))

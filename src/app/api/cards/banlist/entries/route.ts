@@ -25,23 +25,43 @@ type DbBanlistEntry = {
 
 const normalizeCardName = (name: string) => name.trim().toLowerCase()
 
+async function fetchAllActiveRotationCards(): Promise<RotationCard[]> {
+  const supabase = getSupabaseClient()
+  const batchSize = 1000
+  let from = 0
+  let allCards: RotationCard[] = []
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('name, expansion')
+      .eq('is_active', true)
+      .range(from, from + batchSize - 1)
+
+    if (error) {
+      throw error
+    }
+
+    if (data?.length) {
+      allCards = allCards.concat(data as RotationCard[])
+      from += batchSize
+    }
+
+    if (!data || data.length < batchSize) {
+      break
+    }
+  }
+
+  return allCards
+}
+
 async function getDeckBuilderAvailableCardNames(cardNames: string[]): Promise<Set<string>> {
   if (cardNames.length === 0) {
     return new Set()
   }
 
-  const supabase = getSupabaseClient()
-  const { data, error } = await supabase
-    .from('cards')
-    .select('name, expansion')
-    .eq('is_active', true)
-
-  if (error) {
-    throw error
-  }
-
   const requestedNames = new Set(cardNames.map(normalizeCardName))
-  const candidateCards = ((data || []) as RotationCard[]).filter((card) =>
+  const candidateCards = (await fetchAllActiveRotationCards()).filter((card) =>
     requestedNames.has(normalizeCardName(card.name))
   )
   const cardsInRotation = await filterCardsInRotation(candidateCards, 'Imperio Racial')
