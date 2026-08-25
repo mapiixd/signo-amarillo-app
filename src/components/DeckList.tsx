@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Swal from 'sweetalert2'
 import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
 import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
+import { DeckBanlistStatusBadge } from '@/components/DeckBanlistStatusBadge'
 
 interface DeckListProps {
   decks: DeckWithCards[]
@@ -125,6 +126,12 @@ export function DeckList({ decks, onDelete }: DeckListProps) {
                     {deck.season}
                   </span>
                 )}
+                <DeckBanlistStatusBadge
+                  status={deck.banlist_status}
+                  issues={deck.banlist_issues}
+                  checkedAt={deck.banlist_checked_at}
+                  compact
+                />
               </div>
             </div>
           </div>

@@ -42,7 +42,7 @@ export function middleware(request: NextRequest) {
 
   // Rutas de API públicas (cards, expansions, community decks, etc.)
   // /api/decks/[id] puede ser pública si el mazo es público, pero eso se verifica en la API
-  const isPublicApiRoute = pathname.startsWith('/api/cards') || pathname.startsWith('/api/expansions') || pathname.startsWith('/api/decks/community');
+  const isPublicApiRoute = pathname.startsWith('/api/cards') || pathname.startsWith('/api/expansions') || pathname.startsWith('/api/decks/community') || pathname.startsWith('/api/cron/');
   if (isPublicApiRoute) {
     return NextResponse.next();
   }

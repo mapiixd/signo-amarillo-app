@@ -9,6 +9,7 @@ import Footer from '@/components/Footer'
 import Swal from 'sweetalert2'
 import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
 import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
+import { DeckBanlistStatusBadge } from '@/components/DeckBanlistStatusBadge'
 
 const DeckCostChart = dynamic(() => import('@/components/DeckCostChart'), { ssr: false })
 
@@ -752,6 +753,11 @@ export default function DeckViewPage() {
                         {deck.season}
                       </span>
                     )}
+                      <DeckBanlistStatusBadge
+                        status={deck.banlist_status}
+                        issues={deck.banlist_issues}
+                        checkedAt={deck.banlist_checked_at}
+                      />
                     <span className="text-[#A0A0A0]">
                       Creada: {formatDate(deck.created_at)}
                     </span>
@@ -846,6 +852,39 @@ export default function DeckViewPage() {
             </div>
           </div>
 
+          {deck.banlist_status === 'invalid' && deck.banlist_issues && deck.banlist_issues.length > 0 && (
+            <div className="bg-red-950/30 border border-red-500/50 rounded-xl p-4 sm:p-5 mb-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-red-200">Revisar banlist</p>
+                  <h2 className="text-xl font-bold text-[#F4C430] mt-1">Este mazo tiene cartas restringidas</h2>
+                  <p className="text-sm text-[#E8E8E8] mt-2">
+                    La lista sigue visible, pero contiene cartas prohibidas o más copias que las permitidas por la banlist actual.
+                  </p>
+                </div>
+                {deck.banlist_checked_at && (
+                  <span className="text-xs text-[#A0A0A0]">
+                    Revisado: {formatDate(deck.banlist_checked_at)}
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 mt-4">
+                {deck.banlist_issues.map((issue) => (
+                  <div key={`${issue.cardName}-${issue.status}`} className="bg-[#0A0E1A] border border-red-500/30 rounded-lg p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-semibold text-white">{issue.cardName}</p>
+                      <span className="shrink-0 rounded-full bg-red-500/20 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-red-200">
+                        {issue.status === 'banned' ? 'Prohibida' : `Max ${issue.maxCopies}`}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[#A0A0A0] mt-2">
+                      Tiene {issue.actualCopies} copia{issue.actualCopies === 1 ? '' : 's'} entre {issue.zones.includes('main') ? 'mazo principal' : ''}{issue.zones.length > 1 ? ' y ' : ''}{issue.zones.includes('sideboard') ? 'sidedeck' : ''}.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {/* Stats y Tabs */}
           <div className="bg-[#0F1419] border border-[#2D9B96] rounded-xl overflow-hidden">
             {/* Stats Row */}
