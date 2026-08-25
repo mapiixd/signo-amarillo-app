@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { clearBanlistCache } from '@/lib/banlist'
 
+async function markDeckBanlistAuditsUnchecked() {
+  const supabase = getSupabaseClient()
+  const { error } = await supabase
+    .from('decks')
+    .update({
+      banlist_status: 'unchecked',
+      banlist_issues: [],
+      banlist_checked_at: null,
+    })
+    .neq('banlist_status', 'unchecked')
+
+  if (error) {
+    console.error('Error marking deck banlist audits as unchecked:', error)
+  }
+}
+
 // GET /api/admin/banlist - Obtener todas las entradas de banlist
 export async function GET(request: NextRequest) {
   try {
@@ -93,6 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Limpiar cache
     clearBanlistCache()
+    await markDeckBanlistAuditsUnchecked()
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
@@ -131,6 +148,7 @@ export async function DELETE(request: NextRequest) {
 
     // Limpiar cache
     clearBanlistCache()
+    await markDeckBanlistAuditsUnchecked()
 
     return NextResponse.json({ success: true })
   } catch (error) {

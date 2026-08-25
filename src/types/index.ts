@@ -59,8 +59,23 @@ export type Deck = {
   season: string | null  // Temporada en la que se creó (ej: KvM: Titanes). NULL = mazos antiguos.
   cards: DeckCardEntry[]  // Array JSONB de cartas del mazo principal
   sideboard: DeckCardEntry[]  // Array JSONB de cartas del sideboard
+  banlist_status?: DeckBanlistStatus
+  banlist_issues?: DeckBanlistIssue[]
+  banlist_checked_at?: string | null
   created_at: string
   updated_at: string
+}
+
+export type DeckBanlistStatus = 'valid' | 'invalid' | 'unchecked'
+
+export type DeckBanlistIssueZone = 'main' | 'sideboard'
+
+export type DeckBanlistIssue = {
+  cardName: string
+  status: 'banned' | 'limited-1' | 'limited-2' | 'allowed'
+  maxCopies: number
+  actualCopies: number
+  zones: DeckBanlistIssueZone[]
 }
 
 // Tipos legacy - mantener para compatibilidad durante migración

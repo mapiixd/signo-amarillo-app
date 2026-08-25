@@ -1,10 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { getCurrentSession } from '@/lib/auth'
-import type { DeckCardEntry } from '@/types'
+import type { Deck, DeckBanlistIssue } from '@/types'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
 export const dynamic = 'force-dynamic'
+
+type CommunityDeckDb = Deck & {
+  deck_likes?: Array<{
+    id: string
+    user_id: string
+  }>
+  banlist_status?: Deck['banlist_status']
+  banlist_issues?: DeckBanlistIssue[]
+  banlist_checked_at?: string | null
+}
+
+type UserSummary = {
+  id: string
+  username: string
+}
+
+type UserLike = {
+  deck_id: string
+}
 
 // GET /api/decks/community - Obtener mazos públicos de la comunidad
 export async function GET(request: NextRequest) {
@@ -86,18 +105,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener información de usuarios para los mazos
-    const userIds = Array.from(new Set((decks || []).map((d: any) => d.user_id)))
+    const typedDecks = (decks || []) as CommunityDeckDb[]
+    const userIds = Array.from(new Set(typedDecks.map((deck) => deck.user_id)))
     const { data: usersData } = await supabase
       .from('users')
       .select('id, username')
       .in('id', userIds)
 
-    const usersMap = new Map((usersData || []).map((u: any) => [u.id, u]))
+    const usersMap = new Map(((usersData || []) as UserSummary[]).map((user) => [user.id, user]))
 
     // Obtener likes del usuario actual si está autenticado
     let userLikesSet = new Set<string>()
     if (currentUserId) {
-      const deckIds = (decks || []).map((d: any) => d.id)
+      const deckIds = typedDecks.map((deck) => deck.id)
       if (deckIds.length > 0) {
         const { data: userLikes } = await supabase
           .from('deck_likes')
@@ -106,7 +126,7 @@ export async function GET(request: NextRequest) {
           .in('deck_id', deckIds)
         
         if (userLikes) {
-          userLikesSet = new Set(userLikes.map((like: any) => like.deck_id))
+          userLikesSet = new Set((userLikes as UserLike[]).map((like) => like.deck_id))
         }
       }
     }
@@ -114,7 +134,7 @@ export async function GET(request: NextRequest) {
     // Para el listado, no necesitamos los datos completos de las cartas
     // Solo mantenemos los IDs y cantidades para calcular totales
     // Los datos completos se cargarán cuando el usuario vea el mazo individual
-    const decksWithCards = (decks || []).map((deck: any) => {
+    const decksWithCards = typedDecks.map((deck) => {
       // Contar likes
       const likesCount = deck.deck_likes?.length || 0
 
@@ -132,6 +152,9 @@ export async function GET(request: NextRequest) {
         // El frontend solo necesita las cantidades para mostrar totales
         cards: deck.cards || [],
         sideboard: deck.sideboard || [],
+        banlist_status: deck.banlist_status || 'unchecked',
+        banlist_issues: deck.banlist_issues || [],
+        banlist_checked_at: deck.banlist_checked_at || null,
         likes_count: likesCount,
         is_liked: is_liked,
         user: user ? { id: user.id, username: user.username } : null
@@ -140,7 +163,7 @@ export async function GET(request: NextRequest) {
 
     // Ordenar por likes si es necesario (después de obtener los datos)
     if (sortBy === 'likes') {
-      decksWithCards.sort((a: any, b: any) => (b.likes_count || 0) - (a.likes_count || 0))
+      decksWithCards.sort((a, b) => (b.likes_count || 0) - (a.likes_count || 0))
     }
 
     const totalPages = Math.ceil((totalCount || 0) / limit)
@@ -156,7 +179,7 @@ export async function GET(request: NextRequest) {
         hasPrev: page > 1
       }
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching community decks:', error)
     return NextResponse.json(
       { error: 'Error al obtener los mazos de la comunidad' },

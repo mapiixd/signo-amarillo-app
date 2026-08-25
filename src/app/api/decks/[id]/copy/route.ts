@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
 import { getCurrentSeason } from '@/lib/season'
-import type { DeckCardEntry } from '@/types'
+import type { Card, DeckCardEntry } from '@/types'
+import { auditAndPersistExpandedDeck } from '@/lib/deck-banlist-audit'
+
+type ExpandedDeckCardEntry = DeckCardEntry & {
+  card: Card
+}
+
+function hasCard(entry: DeckCardEntry & { card?: Card }): entry is ExpandedDeckCardEntry {
+  return Boolean(entry.card)
+}
 
 // POST /api/decks/[id]/copy - Copiar un mazo público a los mazos del usuario
 export async function POST(
@@ -87,23 +96,28 @@ export async function POST(
         console.error('Error fetching cards:', cardsError)
       } else {
         // Crear mapa de cartas
-        const cardsMap = new Map(cardsData.map((card: any) => [card.id, card]))
+        const cardsMap = new Map((cardsData as Card[]).map((card) => [card.id, card]))
 
         // Expandir con datos completos
         const expandedCards = (copiedDeck.cards || []).map((entry: DeckCardEntry) => ({
           ...entry,
           card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
+        })).filter(hasCard)
 
         const expandedSideboard = (copiedDeck.sideboard || []).map((entry: DeckCardEntry) => ({
           ...entry,
           card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
+        })).filter(hasCard)
+
+        const audit = await auditAndPersistExpandedDeck(copiedDeck, expandedCards, expandedSideboard)
 
         return NextResponse.json({
           ...copiedDeck,
           cards: expandedCards,
-          sideboard: expandedSideboard
+          sideboard: expandedSideboard,
+          banlist_status: audit.status,
+          banlist_issues: audit.issues,
+          banlist_checked_at: audit.checkedAt
         }, { status: 201 })
       }
     }
@@ -115,10 +129,10 @@ export async function POST(
       sideboard: []
     }, { status: 201 })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error copying deck:', error)
     
-    if (error.message === 'No autenticado') {
+    if (error instanceof Error && error.message === 'No autenticado') {
       return NextResponse.json(
         { error: 'No autenticado' },
         { status: 401 }

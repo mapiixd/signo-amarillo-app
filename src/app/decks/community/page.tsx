@@ -8,6 +8,7 @@ import Footer from '@/components/Footer'
 import { useRouter } from 'next/navigation'
 import { formatDate, getFormatDisplayLabel } from '@/lib/utils'
 import { RACE_IMAGE_POSITION } from '@/lib/race-image-position'
+import { DeckBanlistStatusBadge } from '@/components/DeckBanlistStatusBadge'
 
 interface CommunityDeck extends DeckWithCards {
   likes_count?: number
@@ -418,6 +419,12 @@ export default function CommunityDecksPage() {
                             {deck.season}
                           </span>
                         )}
+                <DeckBanlistStatusBadge
+                  status={deck.banlist_status}
+                  issues={deck.banlist_issues}
+                  checkedAt={deck.banlist_checked_at}
+                  compact
+                />
                       </div>
                       {deck.user && (
                         <p className="text-xs text-[#A0A0A0] mt-2">

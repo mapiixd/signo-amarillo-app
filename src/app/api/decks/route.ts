@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase-server'
 import { requireAuth } from '@/lib/auth'
 import { getCurrentSeason } from '@/lib/season'
-import type { DeckCardEntry } from '@/types'
+import type { Card, DeckCardEntry } from '@/types'
+import { auditAndPersistExpandedDeck } from '@/lib/deck-banlist-audit'
 
 // Forzar que esta ruta sea dinámica para evitar ejecución durante el build
 export const dynamic = 'force-dynamic'
+
+type IncomingDeckCard = {
+  id: string
+  quantity?: number
+}
+
+type ExpandedDeckCardEntry = DeckCardEntry & {
+  card: Card
+}
+
+function hasCard(entry: DeckCardEntry & { card?: Card }): entry is ExpandedDeckCardEntry {
+  return Boolean(entry.card)
+}
 
 // GET /api/decks - Obtener todas las barajas del usuario autenticado
 export async function GET() {
@@ -56,32 +70,44 @@ export async function GET() {
         }
 
         // Crear un mapa de cartas por ID para búsqueda rápida
-        const cardsMap = new Map(cardsData.map(card => [card.id, card]))
+        const cardsMap = new Map((cardsData as Card[]).map(card => [card.id, card]))
 
         // Combinar datos del JSONB con los datos completos de las cartas
         const expandedCards = deck.cards.map((entry: DeckCardEntry) => ({
           ...entry,
           card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card) // Filtrar cartas no encontradas
+        })).filter(hasCard) // Filtrar cartas no encontradas
 
         const expandedSideboard = deck.sideboard.map((entry: DeckCardEntry) => ({
           ...entry,
           card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
+        })).filter(hasCard)
+
+        const shouldAudit = !deck.banlist_checked_at || deck.banlist_status === 'unchecked'
+        const audit = shouldAudit
+          ? await auditAndPersistExpandedDeck(deck, expandedCards, expandedSideboard)
+          : {
+              status: deck.banlist_status || 'unchecked',
+              issues: deck.banlist_issues || [],
+              checkedAt: deck.banlist_checked_at || ''
+            }
 
         return {
           ...deck,
           cards: expandedCards,
-          sideboard: expandedSideboard
+          sideboard: expandedSideboard,
+          banlist_status: audit.status,
+          banlist_issues: audit.issues,
+          banlist_checked_at: audit.checkedAt || deck.banlist_checked_at
         }
       })
     )
 
     return NextResponse.json(decksWithCards)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching decks:', error)
     
-    if (error.message === 'No autenticado') {
+    if (error instanceof Error && error.message === 'No autenticado') {
       return NextResponse.json(
         { error: 'No autenticado' },
         { status: 401 }
@@ -121,12 +147,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Fecha actual para created_at y updated_at
-    const cardsArray: DeckCardEntry[] = (cards || []).map((card: any) => ({
+    const cardsArray: DeckCardEntry[] = ((cards || []) as IncomingDeckCard[]).map((card) => ({
       card_id: card.id,
       quantity: card.quantity || 1
     }))
 
-    const sideboardArray: DeckCardEntry[] = (sideboard || []).map((card: any) => ({
+    const sideboardArray: DeckCardEntry[] = ((sideboard || []) as IncomingDeckCard[]).map((card) => ({
       card_id: card.id,
       quantity: card.quantity || 1
     }))
@@ -174,23 +200,28 @@ export async function POST(request: NextRequest) {
         console.error('Error fetching cards:', cardsError)
       } else {
         // Crear mapa de cartas
-        const cardsMap = new Map(cardsData.map(card => [card.id, card]))
+        const cardsMap = new Map((cardsData as Card[]).map(card => [card.id, card]))
 
         // Expandir con datos completos
         const expandedCards = deck.cards.map((entry: DeckCardEntry) => ({
           ...entry,
           card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
+        })).filter(hasCard)
 
         const expandedSideboard = deck.sideboard.map((entry: DeckCardEntry) => ({
           ...entry,
           card: cardsMap.get(entry.card_id)
-        })).filter((c: any) => c.card)
+        })).filter(hasCard)
+
+        const audit = await auditAndPersistExpandedDeck(deck, expandedCards, expandedSideboard)
 
         return NextResponse.json({
           ...deck,
           cards: expandedCards,
-          sideboard: expandedSideboard
+          sideboard: expandedSideboard,
+          banlist_status: audit.status,
+          banlist_issues: audit.issues,
+          banlist_checked_at: audit.checkedAt
         }, { status: 201 })
       }
     }
@@ -202,10 +233,10 @@ export async function POST(request: NextRequest) {
       sideboard: []
     }, { status: 201 })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating deck:', error)
     
-    if (error.message === 'No autenticado') {
+    if (error instanceof Error && error.message === 'No autenticado') {
       return NextResponse.json(
         { error: 'No autenticado' },
         { status: 401 }
