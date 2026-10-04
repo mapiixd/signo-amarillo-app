@@ -3,7 +3,7 @@
  * para poder filtrar por rotación de cartas en el futuro.
  * Actualizar este valor cuando comience una nueva temporada.
  */
-export const CURRENT_SEASON = 'AyD: Vigilantes'
+export const CURRENT_SEASON = 'Drácula: Rey Vampiro'
 
 export function getCurrentSeason(): string {
   return CURRENT_SEASON
